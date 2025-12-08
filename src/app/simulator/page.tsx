@@ -3,538 +3,658 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Pause, Play, RotateCcw, Trophy, Info } from 'lucide-react';
+import {
+  ArrowLeft, Pause, Play, RotateCcw, Trophy, Info,
+  Clock, Briefcase, Users, DollarSign, Server, Heart,
+  Brain, Zap, TrendingUp, Settings, Save, FolderOpen,
+  CheckCircle, AlertTriangle, Star, Target, Calendar
+} from 'lucide-react';
+import { useGameStore } from '@/game/store/gameStore';
+import { TASKS } from '@/game/data/tasks';
+import { EVENTS } from '@/game/data/events';
+import {
+  Task, TaskCategory, GameEvent, DecisionOption,
+  DayPhase, Difficulty
+} from '@/game/types';
 
-interface GameState {
-  day: number;
-  money: number;
-  users: number;
-  premiumUsers: number;
-  dailyActiveUsers: number;
-  serverHealth: number;
-  reputation: number;
-  stress: number;
-  energy: number;
-  devProgress: {
-    errorHandling: number;
-    performance: number;
-    security: number;
-    testing: number;
-    cicd: number;
-  };
-  features: {
-    words101: boolean;
-    flashcards: boolean;
-    quiz: boolean;
-    achievements: boolean;
-    mobileApp: boolean;
-    aiMnemonics: boolean;
-  };
-  costs: {
-    server: number;
-    api: number;
-    domain: number;
-  };
-  stats: {
-    totalRevenue: number;
-    totalExpenses: number;
-    bugsFixed: number;
-    ticketsResolved: number;
-  };
-  currentEvent: GameEvent | null;
-  gameOver: boolean;
-  gameOverReason: string;
-  showResult: string | null;
-}
+const formatMoney = (amount: number) =>
+  new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + '원';
 
-interface GameChoice {
-  text: string;
-  effect: Partial<GameState>;
-  result: string;
-}
+const formatNumber = (num: number) =>
+  new Intl.NumberFormat('ko-KR').format(Math.round(num));
 
-interface GameEvent {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  description: string;
-  choices: GameChoice[];
-}
-
-const INITIAL_STATE: GameState = {
-  day: 1,
-  money: 5000000,
-  users: 50,
-  premiumUsers: 3,
-  dailyActiveUsers: 25,
-  serverHealth: 100,
-  reputation: 70,
-  stress: 20,
-  energy: 100,
-  devProgress: { errorHandling: 0, performance: 0, security: 0, testing: 0, cicd: 0 },
-  features: { words101: true, flashcards: true, quiz: false, achievements: false, mobileApp: false, aiMnemonics: false },
-  costs: { server: 50000, api: 30000, domain: 15000 },
-  stats: { totalRevenue: 0, totalExpenses: 0, bugsFixed: 0, ticketsResolved: 0 },
-  currentEvent: null,
-  gameOver: false,
-  gameOverReason: '',
-  showResult: null,
+const getDayPhaseIcon = (phase: DayPhase) => {
+  switch (phase) {
+    case 'morning': return '🌅';
+    case 'afternoon': return '☀️';
+    case 'evening': return '🌆';
+    case 'night': return '🌙';
+  }
 };
 
-const EVENTS: GameEvent[] = [
-  {
-    id: 'critical_bug', type: 'bug', severity: 'critical',
-    title: '🚨 긴급 버그 발생!',
-    description: 'SM-2 알고리즘에서 치명적인 버그가 발견되었습니다. 사용자들의 학습 진행도가 초기화되고 있어요!',
-    choices: [
-      { text: '밤새 직접 수정한다 (-30 에너지)', effect: { energy: -30, stress: 10, serverHealth: 10, reputation: 5 }, result: '5시간 디버깅 끝에 해결! 사용자들이 빠른 대응에 감사해했습니다.' },
-      { text: '내일 아침에 처리한다', effect: { reputation: -15, users: -5, premiumUsers: -1 }, result: '밤사이 5명의 사용자가 불만을 품고 떠났습니다...' },
-      { text: '외주 개발자에게 맡긴다 (-200,000원)', effect: { money: -200000, reputation: 5 }, result: '비용이 들었지만 전문가가 깔끔하게 해결했습니다.' },
-    ],
-  },
-  {
-    id: 'minor_bug', type: 'bug', severity: 'minor',
-    title: '🐛 사소한 버그 리포트',
-    description: 'iOS Safari에서 플래시카드 애니메이션이 끊긴다는 신고가 들어왔습니다.',
-    choices: [
-      { text: '바로 수정한다 (-10 에너지)', effect: { energy: -10, reputation: 3 }, result: 'CSS 최적화로 해결! 해당 사용자가 5점 리뷰를 남겼습니다.' },
-      { text: '다음 업데이트에 포함', effect: { reputation: -2 }, result: '사용자는 이해했지만 살짝 실망한 눈치입니다.' },
-      { text: '재현이 안 된다고 답변', effect: { reputation: -8 }, result: '사용자가 트위터에 불만을 토로했습니다.' },
-    ],
-  },
-  {
-    id: 'server_down', type: 'server', severity: 'critical',
-    title: '💥 서버 다운!',
-    description: 'Railway 서버가 갑자기 다운되었습니다! 사용자들이 접속할 수 없어요!',
-    choices: [
-      { text: '즉시 서버 재시작 (-15 에너지)', effect: { energy: -15, serverHealth: 20 }, result: '10분 만에 복구! 피해는 크지 않았습니다.' },
-      { text: 'Railway 고객센터에 문의', effect: { serverHealth: -10, reputation: -5 }, result: '30분 후 자동 복구되었지만 사용자들이 불안해합니다.' },
-      { text: 'Vercel로 긴급 마이그레이션 (-500,000원)', effect: { money: -500000, serverHealth: 40, reputation: 10 }, result: '시간과 비용이 들었지만 더 안정적인 환경이 되었습니다!' },
-    ],
-  },
-  {
-    id: 'traffic_spike', type: 'server', severity: 'warning',
-    title: '📈 트래픽 폭증!',
-    description: '유명 유튜버가 VocaVision을 소개했습니다! 트래픽이 10배입니다!',
-    choices: [
-      { text: '서버 스케일업 (-300,000원)', effect: { money: -300000, users: 200, premiumUsers: 15, reputation: 20 }, result: '200명의 새 사용자가 가입했습니다!' },
-      { text: '현재 서버로 버틴다', effect: { serverHealth: -30, users: 50, reputation: -10 }, result: '서버가 느려지면서 많은 신규 사용자가 이탈했습니다...' },
-      { text: 'CDN 캐싱 적용 (-100,000원)', effect: { money: -100000, users: 150, premiumUsers: 10, serverHealth: 10 }, result: '현명한 선택! 적은 비용으로 효과적으로 대응했습니다.' },
-    ],
-  },
-  {
-    id: 'user_feedback', type: 'user', severity: 'normal',
-    title: '💬 사용자 피드백',
-    description: '프리미엄 사용자가 "발음 기능이 있으면 좋겠다"고 요청했습니다.',
-    choices: [
-      { text: 'Web Speech API로 구현 (-20 에너지)', effect: { energy: -20, reputation: 15, premiumUsers: 3 }, result: '사용자들이 새 기능에 열광합니다!' },
-      { text: '"검토해보겠습니다" 답변', effect: { reputation: -3 }, result: '사용자가 약간 실망한 것 같습니다.' },
-      { text: 'Google TTS API 연동 (-80,000원/월)', effect: { money: -80000, reputation: 20, premiumUsers: 5 }, result: '고품질 음성으로 만족도가 크게 올랐습니다!' },
-    ],
-  },
-  {
-    id: 'bad_review', type: 'user', severity: 'warning',
-    title: '⭐ 부정적인 리뷰',
-    description: '앱스토어 1점 리뷰: "단어가 100개밖에 없어서 금방 끝났어요. 환불 원합니다."',
-    choices: [
-      { text: '정중히 답변 + 환불 (-9,990원)', effect: { money: -9990, reputation: 5 }, result: '사용자가 리뷰를 3점으로 수정했습니다.' },
-      { text: '단어 추가 계획을 안내', effect: { reputation: -2 }, result: '기다려보겠다고 했지만 확신은 없어 보입니다.' },
-      { text: '무시한다', effect: { reputation: -10, users: -3 }, result: '다른 잠재 사용자들이 가입을 망설입니다...' },
-    ],
-  },
-  {
-    id: 'viral_moment', type: 'opportunity', severity: 'good',
-    title: '🌟 바이럴 기회!',
-    description: '한 사용자의 학습 인증샷이 트위터에서 500 RT를 기록했습니다!',
-    choices: [
-      { text: '공식 계정으로 리트윗', effect: { users: 80, premiumUsers: 5, reputation: 15 }, result: '자연스러운 홍보 효과! 신규 가입이 급증했습니다.' },
-      { text: '1년 무료 구독 제공 (-119,880원)', effect: { money: -119880, users: 120, premiumUsers: 8, reputation: 25 }, result: '사용자가 감동받아 추가로 홍보해줬습니다! 대박!' },
-      { text: '지켜본다', effect: { users: 30 }, result: '조용히 지나갔지만 일부 효과는 있었습니다.' },
-    ],
-  },
-  {
-    id: 'api_cost_spike', type: 'finance', severity: 'warning',
-    title: '💸 OpenAI API 비용 폭증',
-    description: 'AI 연상법 생성 기능이 인기를 끌면서 API 비용이 예상의 3배입니다!',
-    choices: [
-      { text: '캐싱 시스템 구축 (-50 에너지)', effect: { energy: -50 }, result: '힘들었지만 비용을 절반으로 줄였습니다!' },
-      { text: 'API 호출 제한 설정', effect: { reputation: -10, premiumUsers: -2 }, result: '일부 프리미엄 사용자가 해지했습니다.' },
-      { text: '그냥 지불한다 (-90,000원)', effect: { money: -90000 }, result: '비용이 들었지만 서비스 품질은 유지했습니다.' },
-    ],
-  },
-  {
-    id: 'investment_offer', type: 'opportunity', severity: 'good',
-    title: '💰 투자 제안',
-    description: '엔젤 투자자가 5천만원 투자를 제안했습니다. 단, 지분 15%를 원합니다.',
-    choices: [
-      { text: '투자 받는다 (+50,000,000원)', effect: { money: 50000000, stress: 30 }, result: '자금은 확보했지만 성과를 내야 한다는 압박감이...' },
-      { text: '지분 10%로 협상', effect: { money: 35000000, stress: 20, reputation: 10 }, result: '3500만원에 10% 지분으로 합의했습니다!' },
-      { text: '정중히 거절', effect: { reputation: 5 }, result: '독립성을 지켰지만 기회비용이 아쉽습니다.' },
-    ],
-  },
-  {
-    id: 'security_issue', type: 'security', severity: 'critical',
-    title: '🔒 보안 취약점 발견',
-    description: 'Snyk 스캔에서 높은 심각도의 npm 패키지 취약점이 발견되었습니다!',
-    choices: [
-      { text: '즉시 패키지 업데이트 (-20 에너지)', effect: { energy: -20, reputation: 5 }, result: '신속한 대응으로 보안을 강화했습니다!' },
-      { text: '다음 릴리즈에 포함', effect: { reputation: -5, serverHealth: -5 }, result: '잠재적 위험이 계속 존재합니다...' },
-      { text: '보안 감사 의뢰 (-1,000,000원)', effect: { money: -1000000, reputation: 15 }, result: '전문 감사로 여러 취약점을 해결했습니다!' },
-    ],
-  },
-  {
-    id: 'competitor_launch', type: 'market', severity: 'warning',
-    title: '⚔️ 경쟁사 신규 기능',
-    description: '경쟁 앱이 AI 이미지 생성 기능을 출시했습니다. SNS에서 화제입니다.',
-    choices: [
-      { text: 'DALL-E 3 연동 개발 (-70 에너지, -500,000원)', effect: { energy: -70, money: -500000, reputation: 20 }, result: '2주 후 더 나은 품질의 기능을 출시했습니다!' },
-      { text: '우리만의 강점을 홍보', effect: { reputation: 5, users: 20 }, result: '차별화된 가치를 강조하니 관심있는 사용자들이 유입되었습니다.' },
-      { text: '무시하고 원래 로드맵 진행', effect: { users: -15, reputation: -10 }, result: '일부 사용자들이 경쟁 앱으로 이동했습니다...' },
-    ],
-  },
-  {
-    id: 'burnout', type: 'personal', severity: 'warning',
-    title: '😴 번아웃 징후',
-    description: '최근 며칠간 잠을 제대로 못 잤습니다. 집중력이 떨어지고 실수가 잦아집니다.',
-    choices: [
-      { text: '하루 휴식 (+40 에너지)', effect: { energy: 40, stress: -20 }, result: '푹 쉬고 나니 다시 의욕이 생깁니다!' },
-      { text: '그래도 일한다', effect: { energy: -20, stress: 20 }, result: '결국 실수로 버그를 하나 더 만들었습니다...' },
-      { text: '운동을 다녀온다', effect: { energy: 20, stress: -10 }, result: '가벼운 운동 후 머리가 맑아졌습니다!' },
-    ],
-  },
-  {
-    id: 'media_interview', type: 'opportunity', severity: 'good',
-    title: '🎤 미디어 인터뷰 요청',
-    description: 'IT 매체에서 1인 개발자 인터뷰를 요청했습니다.',
-    choices: [
-      { text: '인터뷰에 응한다 (-15 에너지)', effect: { energy: -15, reputation: 30, users: 100, premiumUsers: 8 }, result: '기사가 나가고 많은 관심을 받았습니다!' },
-      { text: '서면 인터뷰로 대체', effect: { reputation: 15, users: 40 }, result: '효율적으로 처리했고 적당한 홍보 효과를 얻었습니다.' },
-      { text: '정중히 거절', effect: {}, result: '기회를 놓쳤지만 시간은 절약했습니다.' },
-    ],
-  },
-  {
-    id: 'partnership', type: 'opportunity', severity: 'good',
-    title: '🤝 파트너십 제안',
-    description: '대형 어학원에서 B2B 제휴를 제안했습니다.',
-    choices: [
-      { text: '계약 진행 (학생 500명, 월 200만원)', effect: { users: 500, money: 2000000, stress: 20, reputation: 20 }, result: '대형 계약 성사! 하지만 관리 부담도 생겼습니다.' },
-      { text: '파일럿 프로그램 (50명, 무료)', effect: { users: 50, reputation: 10 }, result: '작게 시작해서 검증해보기로 했습니다.' },
-      { text: '준비가 안 됐다고 거절', effect: { reputation: -5 }, result: '기회를 놓쳤지만 현실적인 판단일 수도 있습니다.' },
-    ],
-  },
-];
+const getDayPhaseLabel = (phase: DayPhase) => {
+  switch (phase) {
+    case 'morning': return '아침';
+    case 'afternoon': return '오후';
+    case 'evening': return '저녁';
+    case 'night': return '밤';
+  }
+};
 
-const formatMoney = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount) + '원';
-
-const StatBar = ({ label, value, max, color, icon }: { label: string; value: number; max: number; color: string; icon: string }) => (
+const StatBar = ({
+  label, value, max, color, icon, warning = false
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+  icon: React.ReactNode;
+  warning?: boolean;
+}) => (
   <div className="mb-2">
     <div className="flex justify-between text-xs mb-1">
-      <span className="text-gray-400">{icon} {label}</span>
-      <span className="text-white font-bold">{Math.round(value)}/{max}</span>
+      <span className="text-gray-400 flex items-center gap-1">
+        {icon} {label}
+      </span>
+      <span className={`font-bold ${warning && value < max * 0.3 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+        {Math.round(value)}/{max}
+      </span>
     </div>
     <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-      <div className={`h-full ${color} transition-all duration-300`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div
+        className={`h-full ${color} transition-all duration-300`}
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
     </div>
   </div>
 );
 
+const CategoryButton = ({
+  category,
+  icon,
+  label,
+  selected,
+  onClick
+}: {
+  category: TaskCategory;
+  icon: React.ReactNode;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    className={`p-2 rounded-lg text-xs transition-all ${
+      selected
+        ? 'bg-violet-600 text-white'
+        : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+    }`}
+  >
+    <div className="flex flex-col items-center gap-1">
+      {icon}
+      <span>{label}</span>
+    </div>
+  </button>
+);
+
 export default function SimulatorPage() {
-  const [state, setState] = useState<GameState>(INITIAL_STATE);
-  const [isPaused, setIsPaused] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const store = useGameStore();
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showDifficultyModal, setShowDifficultyModal] = useState(true);
+  const [selectedTaskCategory, setSelectedTaskCategory] = useState<TaskCategory>('development');
+  const [showSaveSlots, setShowSaveSlots] = useState(false);
+  const [showLoadSlots, setShowLoadSlots] = useState(false);
 
-  const monthlyRevenue = state.premiumUsers * 9990;
-  const monthlyCosts = state.costs.server + state.costs.api + Math.round(state.costs.domain / 12);
-
+  // Initialize game on mount
   useEffect(() => {
-    if (isPaused || state.gameOver || state.currentEvent || state.showResult) return;
+    // Check if game has been initialized
+    if (store.time.totalDays === 0) {
+      setShowDifficultyModal(true);
+    } else {
+      setShowDifficultyModal(false);
+    }
+  }, []);
+
+  // Game tick effect
+  useEffect(() => {
+    if (store.time.isPaused || store.gameOver || store.currentEvent) return;
 
     const interval = setInterval(() => {
-      setState(prev => {
-        const n = { ...prev, day: prev.day + 1 };
-        n.energy = Math.min(100, prev.energy + 8);
-        n.stress = Math.max(0, prev.stress - 2);
+      store.tick();
 
-        const userGrowth = Math.floor(Math.random() * 5) - 1;
-        n.users = Math.max(0, prev.users + userGrowth);
-        n.dailyActiveUsers = Math.floor(n.users * (0.3 + Math.random() * 0.3));
-
-        if (Math.random() < 0.08) n.premiumUsers = prev.premiumUsers + Math.floor(Math.random() * 2);
-        n.serverHealth = Math.max(0, prev.serverHealth - (Math.random() * 2));
-
-        if (prev.day % 30 === 0) {
-          const revenue = prev.premiumUsers * 9990;
-          const expenses = prev.costs.server + prev.costs.api + Math.round(prev.costs.domain / 12);
-          n.money = prev.money + revenue - expenses;
-          n.stats = { ...prev.stats, totalRevenue: prev.stats.totalRevenue + revenue, totalExpenses: prev.stats.totalExpenses + expenses };
+      // Random event trigger (12% chance per tick)
+      if (Math.random() < 0.12 && !store.currentEvent && !store.activeTask) {
+        const eligibleEvents = EVENTS.filter(e => {
+          if (e.minDay && store.time.totalDays < e.minDay) return false;
+          return true;
+        });
+        if (eligibleEvents.length > 0) {
+          const randomEvent = eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
+          store.triggerEvent(randomEvent);
         }
-
-        if (Math.random() < 0.12) {
-          n.currentEvent = EVENTS[Math.floor(Math.random() * EVENTS.length)];
-        }
-
-        if (n.money < -1000000) { n.gameOver = true; n.gameOverReason = '💸 자금이 -100만원 이하로 떨어졌습니다. 파산으로 VocaVision은 문을 닫았습니다...'; }
-        else if (n.serverHealth <= 0) { n.gameOver = true; n.gameOverReason = '💥 서버가 완전히 다운되어 복구 불가능 상태가 되었습니다...'; }
-        else if (n.reputation <= 0) { n.gameOver = true; n.gameOverReason = '😢 평판이 바닥으로 떨어져 더 이상 사용자를 유치할 수 없게 되었습니다...'; }
-        else if (n.stress >= 100) { n.gameOver = true; n.gameOverReason = '😴 극심한 스트레스로 건강이 악화되었습니다. 당분간 휴식이 필요합니다...'; }
-
-        return n;
-      });
-    }, 2500);
+      }
+    }, store.time.speed === 1 ? 2000 : store.time.speed === 2 ? 1000 : 500);
 
     return () => clearInterval(interval);
-  }, [isPaused, state.gameOver, state.currentEvent, state.showResult]);
+  }, [store.time.isPaused, store.gameOver, store.currentEvent, store.time.speed]);
 
-  const handleChoice = useCallback((choice: GameChoice) => {
-    setState(prev => {
-      const n = { ...prev };
-      const effect = choice.effect as Record<string, number>;
-      if (effect.money) n.money += effect.money;
-      if (effect.users) n.users += effect.users;
-      if (effect.premiumUsers) n.premiumUsers = Math.max(0, prev.premiumUsers + effect.premiumUsers);
-      if (effect.energy) n.energy = Math.max(0, Math.min(100, prev.energy + effect.energy));
-      if (effect.stress) n.stress = Math.max(0, Math.min(100, prev.stress + effect.stress));
-      if (effect.reputation) n.reputation = Math.max(0, Math.min(100, prev.reputation + effect.reputation));
-      if (effect.serverHealth) n.serverHealth = Math.max(0, Math.min(100, prev.serverHealth + effect.serverHealth));
-      n.currentEvent = null;
-      n.showResult = choice.result;
-      return n;
-    });
-  }, []);
+  const handleStartGame = useCallback((difficulty: Difficulty) => {
+    store.initializeGame(difficulty);
+    setShowDifficultyModal(false);
+  }, [store]);
 
-  const handleAction = useCallback((action: string) => {
-    setState(prev => {
-      const n = { ...prev };
-      if (action === 'develop' && prev.energy >= 20) {
-        n.energy = prev.energy - 20;
-        const keys = Object.keys(prev.devProgress) as (keyof typeof prev.devProgress)[];
-        const key = keys[Math.floor(Math.random() * keys.length)];
-        n.devProgress = { ...prev.devProgress, [key]: Math.min(100, prev.devProgress[key] + 10) };
-      } else if (action === 'marketing' && prev.money >= 100000) {
-        n.money = prev.money - 100000;
-        const newUsers = Math.floor(Math.random() * 30) + 10;
-        n.users = prev.users + newUsers;
-        n.premiumUsers = prev.premiumUsers + Math.floor(newUsers * 0.05);
-      } else if (action === 'server' && prev.energy >= 15) {
-        n.energy = prev.energy - 15;
-        n.serverHealth = Math.min(100, prev.serverHealth + 20);
-      } else if (action === 'rest') {
-        n.day = prev.day + 1;
-        n.energy = Math.min(100, prev.energy + 40);
-        n.stress = Math.max(0, prev.stress - 15);
-      }
-      return n;
-    });
-  }, []);
+  const handleTaskSelect = useCallback((task: Task) => {
+    if (store.player.health.energy < task.requirements.energy) {
+      alert('에너지가 부족합니다!');
+      return;
+    }
+    if (task.requirements.money && store.business.finance.cash < task.requirements.money) {
+      alert('자금이 부족합니다!');
+      return;
+    }
+    store.startTask(task);
+    setShowTaskModal(false);
+  }, [store]);
+
+  const handleEventChoice = useCallback((choice: DecisionOption) => {
+    store.handleEventChoice(choice);
+  }, [store]);
+
+  const monthlyRevenue = store.business.users.premium * 9990;
+  const monthlyCosts =
+    store.business.infrastructure.serverHealth > 0
+      ? 50000 + Math.floor(store.business.users.total / 100) * 5000
+      : 0;
+  const monthlyProfit = monthlyRevenue - monthlyCosts;
+
+  // Filter tasks by category
+  const filteredTasks = TASKS.filter(t => t.category === selectedTaskCategory);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white p-4 safe-top safe-bottom">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 text-white">
+      {/* Difficulty Selection Modal */}
+      {showDifficultyModal && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-md w-full">
+            <h2 className="text-2xl font-black text-center mb-2">
+              VocaVision Simulator
+            </h2>
+            <p className="text-gray-400 text-center text-sm mb-6">
+              1인 EdTech 사업 시뮬레이터
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handleStartGame('easy')}
+                className="w-full p-4 bg-emerald-600/20 border border-emerald-500/30 rounded-xl text-left hover:bg-emerald-600/30 transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-emerald-400">쉬움</div>
+                    <div className="text-xs text-gray-400">초기 자금 1천만원, 여유로운 시작</div>
+                  </div>
+                  <span className="text-2xl">🌱</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleStartGame('normal')}
+                className="w-full p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl text-left hover:bg-blue-600/30 transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-blue-400">보통</div>
+                    <div className="text-xs text-gray-400">초기 자금 500만원, 균형잡힌 도전</div>
+                  </div>
+                  <span className="text-2xl">⚖️</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleStartGame('hard')}
+                className="w-full p-4 bg-amber-600/20 border border-amber-500/30 rounded-xl text-left hover:bg-amber-600/30 transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-amber-400">어려움</div>
+                    <div className="text-xs text-gray-400">초기 자금 200만원, 생존이 목표</div>
+                  </div>
+                  <span className="text-2xl">🔥</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleStartGame('realistic')}
+                className="w-full p-4 bg-red-600/20 border border-red-500/30 rounded-xl text-left hover:bg-red-600/30 transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-red-400">현실</div>
+                    <div className="text-xs text-gray-400">초기 자금 100만원, 실제 창업 체험</div>
+                  </div>
+                  <span className="text-2xl">💀</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
-              VocaVision 🚀
-            </h1>
-            <p className="text-xs text-gray-500">1인 EdTech 사업 시뮬레이터</p>
-          </div>
-        </div>
-        <div className="text-right flex items-center gap-2">
-          <div>
-            <div className="text-xl sm:text-2xl font-black">Day {state.day}</div>
-          </div>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowHelp(true)}
-              className="text-gray-400 hover:text-white"
-            >
-              <Info className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsPaused(!isPaused)}
-              className="text-gray-400 hover:text-white"
-            >
-              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center">
-          <div className="text-base sm:text-lg">💰</div>
-          <div className={`text-xs sm:text-sm font-bold ${state.money < 500000 ? 'text-red-400' : 'text-emerald-400'}`}>
-            {formatMoney(state.money)}
-          </div>
-          <div className="text-xs text-gray-500 hidden sm:block">잔고</div>
-        </div>
-        <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center">
-          <div className="text-base sm:text-lg">👥</div>
-          <div className="text-xs sm:text-sm font-bold">{state.users}</div>
-          <div className="text-xs text-gray-500 hidden sm:block">사용자</div>
-        </div>
-        <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center">
-          <div className="text-base sm:text-lg">⭐</div>
-          <div className="text-xs sm:text-sm font-bold text-amber-400">{state.premiumUsers}</div>
-          <div className="text-xs text-gray-500 hidden sm:block">프리미엄</div>
-        </div>
-        <div className="bg-gray-800/50 rounded-xl p-2 sm:p-3 text-center">
-          <div className="text-base sm:text-lg">📊</div>
-          <div className="text-xs sm:text-sm font-bold">{state.dailyActiveUsers}</div>
-          <div className="text-xs text-gray-500 hidden sm:block">DAU</div>
-        </div>
-      </div>
-
-      {/* Status Bars */}
-      <div className="bg-gray-800/30 rounded-xl p-3 sm:p-4 mb-4">
-        <StatBar label="에너지" value={state.energy} max={100} color="bg-emerald-500" icon="⚡" />
-        <StatBar label="스트레스" value={state.stress} max={100} color="bg-red-500" icon="😰" />
-        <StatBar label="서버 상태" value={state.serverHealth} max={100} color="bg-blue-500" icon="🖥️" />
-        <StatBar label="평판" value={state.reputation} max={100} color="bg-purple-500" icon="⭐" />
-      </div>
-
-      {/* Monthly Finance */}
-      <div className="bg-gray-800/30 rounded-xl p-3 sm:p-4 mb-4">
-        <div className="text-xs text-gray-400 mb-2">📈 월간 재정</div>
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="bg-emerald-500/20 rounded-lg p-2">
-            <div className="text-emerald-400 font-bold">{formatMoney(monthlyRevenue)}</div>
-            <div className="text-gray-500">수익</div>
-          </div>
-          <div className="bg-red-500/20 rounded-lg p-2">
-            <div className="text-red-400 font-bold">{formatMoney(monthlyCosts)}</div>
-            <div className="text-gray-500">비용</div>
-          </div>
-          <div className={`${monthlyRevenue >= monthlyCosts ? 'bg-blue-500/20' : 'bg-orange-500/20'} rounded-lg p-2`}>
-            <div className={`${monthlyRevenue >= monthlyCosts ? 'text-blue-400' : 'text-orange-400'} font-bold`}>
-              {formatMoney(monthlyRevenue - monthlyCosts)}
-            </div>
-            <div className="text-gray-500">순이익</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <button
-          onClick={() => handleAction('develop')}
-          disabled={state.energy < 20}
-          className="bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-2 sm:p-3 text-center transition-all active:scale-95"
-        >
-          <div className="text-base sm:text-lg">💻</div>
-          <div className="text-xs">개발</div>
-        </button>
-        <button
-          onClick={() => handleAction('marketing')}
-          disabled={state.money < 100000}
-          className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-2 sm:p-3 text-center transition-all active:scale-95"
-        >
-          <div className="text-base sm:text-lg">📢</div>
-          <div className="text-xs">마케팅</div>
-        </button>
-        <button
-          onClick={() => handleAction('server')}
-          disabled={state.energy < 15}
-          className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-2 sm:p-3 text-center transition-all active:scale-95"
-        >
-          <div className="text-base sm:text-lg">🔧</div>
-          <div className="text-xs">서버점검</div>
-        </button>
-        <button
-          onClick={() => handleAction('rest')}
-          className="bg-emerald-600 hover:bg-emerald-500 rounded-xl p-2 sm:p-3 text-center transition-all active:scale-95"
-        >
-          <div className="text-base sm:text-lg">😴</div>
-          <div className="text-xs">휴식</div>
-        </button>
-      </div>
-
-      {/* Development Progress */}
-      <div className="bg-gray-800/30 rounded-xl p-3 sm:p-4">
-        <div className="text-xs text-gray-400 mb-2">🛠️ 개발 진행률</div>
-        <div className="grid grid-cols-5 gap-1">
-          {Object.entries(state.devProgress).map(([key, val]) => (
-            <div key={key} className="text-center">
-              <div className="h-10 sm:h-12 bg-gray-700 rounded relative overflow-hidden">
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-violet-500 to-purple-500 transition-all" style={{ height: `${val}%` }} />
+      <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-lg border-b border-white/10">
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-lg font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
+                  VocaVision
+                </h1>
+                <p className="text-xs text-gray-500">1인 EdTech 시뮬레이터</p>
               </div>
-              <div className="text-xs text-gray-500 mt-1">{val}%</div>
             </div>
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-600 mt-1">
-          <span>에러</span><span>성능</span><span>보안</span><span>테스트</span><span>CI/CD</span>
-        </div>
-      </div>
 
-      {/* Help Modal */}
-      {showHelp && (
+            <div className="flex items-center gap-2">
+              {/* Time Display */}
+              <div className="text-right mr-2">
+                <div className="flex items-center gap-1 text-sm">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="font-bold">Day {store.time.totalDays}</span>
+                </div>
+                <div className="text-xs text-gray-400">
+                  {getDayPhaseIcon(store.time.dayPhase)} {getDayPhaseLabel(store.time.dayPhase)}
+                </div>
+              </div>
+
+              {/* Controls */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowHelpModal(true)}
+                className="text-gray-400 hover:text-white"
+              >
+                <Info className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettingsModal(true)}
+                className="text-gray-400 hover:text-white"
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={store.togglePause}
+                className="text-gray-400 hover:text-white"
+              >
+                {store.time.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+        {/* Key Metrics Grid */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-gray-800/50 rounded-xl p-3 text-center">
+            <DollarSign className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
+            <div className={`text-sm font-bold ${store.business.finance.cash < 500000 ? 'text-red-400' : 'text-emerald-400'}`}>
+              {formatMoney(store.business.finance.cash)}
+            </div>
+            <div className="text-xs text-gray-500">잔고</div>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 text-center">
+            <Users className="w-5 h-5 mx-auto mb-1 text-blue-400" />
+            <div className="text-sm font-bold">{formatNumber(store.business.users.total)}</div>
+            <div className="text-xs text-gray-500">사용자</div>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 text-center">
+            <Star className="w-5 h-5 mx-auto mb-1 text-amber-400" />
+            <div className="text-sm font-bold text-amber-400">{formatNumber(store.business.users.premium)}</div>
+            <div className="text-xs text-gray-500">프리미엄</div>
+          </div>
+          <div className="bg-gray-800/50 rounded-xl p-3 text-center">
+            <TrendingUp className="w-5 h-5 mx-auto mb-1 text-purple-400" />
+            <div className="text-sm font-bold">{store.player.social.reputation}</div>
+            <div className="text-xs text-gray-500">평판</div>
+          </div>
+        </div>
+
+        {/* Player Stats */}
+        <div className="bg-gray-800/30 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Heart className="w-4 h-4 text-pink-400" />
+            <span className="text-sm font-semibold">플레이어 상태</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4">
+            <StatBar
+              label="에너지"
+              value={store.player.health.energy}
+              max={100}
+              color="bg-emerald-500"
+              icon={<Zap className="w-3 h-3" />}
+              warning
+            />
+            <StatBar
+              label="스트레스"
+              value={store.player.health.stress}
+              max={100}
+              color="bg-red-500"
+              icon={<AlertTriangle className="w-3 h-3" />}
+            />
+            <StatBar
+              label="체력"
+              value={store.player.health.physical}
+              max={100}
+              color="bg-pink-500"
+              icon={<Heart className="w-3 h-3" />}
+              warning
+            />
+            <StatBar
+              label="정신력"
+              value={store.player.health.mental}
+              max={100}
+              color="bg-blue-500"
+              icon={<Brain className="w-3 h-3" />}
+              warning
+            />
+          </div>
+        </div>
+
+        {/* Business Metrics */}
+        <div className="bg-gray-800/30 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Briefcase className="w-4 h-4 text-violet-400" />
+            <span className="text-sm font-semibold">비즈니스 현황</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="bg-emerald-500/20 rounded-lg p-2">
+              <div className="text-emerald-400 font-bold">{formatMoney(monthlyRevenue)}</div>
+              <div className="text-gray-500">월 수익</div>
+            </div>
+            <div className="bg-red-500/20 rounded-lg p-2">
+              <div className="text-red-400 font-bold">{formatMoney(monthlyCosts)}</div>
+              <div className="text-gray-500">월 비용</div>
+            </div>
+            <div className={`${monthlyProfit >= 0 ? 'bg-blue-500/20' : 'bg-orange-500/20'} rounded-lg p-2`}>
+              <div className={`${monthlyProfit >= 0 ? 'text-blue-400' : 'text-orange-400'} font-bold`}>
+                {monthlyProfit >= 0 ? '+' : ''}{formatMoney(monthlyProfit)}
+              </div>
+              <div className="text-gray-500">순이익</div>
+            </div>
+          </div>
+
+          {/* Infrastructure */}
+          <div className="mt-3">
+            <StatBar
+              label="서버 상태"
+              value={store.business.infrastructure.serverHealth}
+              max={100}
+              color="bg-blue-500"
+              icon={<Server className="w-3 h-3" />}
+              warning
+            />
+            <StatBar
+              label="제품 안정성"
+              value={store.business.product.stability}
+              max={100}
+              color="bg-purple-500"
+              icon={<CheckCircle className="w-3 h-3" />}
+            />
+          </div>
+        </div>
+
+        {/* Current Task */}
+        {store.activeTask && (
+          <div className="bg-violet-600/20 border border-violet-500/30 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-violet-400 animate-spin" />
+                <span className="text-sm font-semibold">진행 중인 업무</span>
+              </div>
+              <span className="text-xs text-gray-400">
+                {Math.round(store.activeTask.progress)}%
+              </span>
+            </div>
+            <div className="text-lg font-bold mb-1">{store.activeTask.task.name}</div>
+            <div className="text-xs text-gray-400 mb-2">{store.activeTask.task.description}</div>
+            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-300"
+                style={{ width: `${store.activeTask.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Action Button */}
+        {!store.activeTask && (
+          <Button
+            onClick={() => setShowTaskModal(true)}
+            variant="gradient"
+            className="w-full py-6 text-lg"
+            disabled={store.time.isPaused}
+          >
+            <Briefcase className="w-5 h-5 mr-2" />
+            업무 선택하기
+          </Button>
+        )}
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-4 gap-2">
+          <button
+            onClick={() => {
+              store.applyEffects([{ type: 'energy', value: 30 }]);
+              store.tick();
+              store.tick();
+            }}
+            disabled={store.time.isPaused || store.activeTask !== null}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
+          >
+            <div className="text-lg">😴</div>
+            <div className="text-xs">휴식</div>
+          </button>
+          <button
+            onClick={() => {
+              if (store.player.health.energy >= 10) {
+                store.applyEffects([
+                  { type: 'energy', value: -10 },
+                  { type: 'stress', value: -15 },
+                  { type: 'health', value: 5 },
+                ]);
+              }
+            }}
+            disabled={store.time.isPaused || store.player.health.energy < 10}
+            className="bg-pink-600 hover:bg-pink-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
+          >
+            <div className="text-lg">🏃</div>
+            <div className="text-xs">운동</div>
+          </button>
+          <button
+            onClick={() => {
+              if (store.business.finance.cash >= 100000) {
+                store.applyEffects([
+                  { type: 'cash', value: -100000 },
+                  { type: 'users', value: Math.floor(Math.random() * 20) + 10 },
+                  { type: 'reputation', value: 5 },
+                ]);
+              }
+            }}
+            disabled={store.time.isPaused || store.business.finance.cash < 100000}
+            className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
+          >
+            <div className="text-lg">📢</div>
+            <div className="text-xs">마케팅</div>
+          </button>
+          <button
+            onClick={() => {
+              if (store.player.health.energy >= 15) {
+                store.applyEffects([
+                  { type: 'energy', value: -15 },
+                  { type: 'server_health', value: 20 },
+                ]);
+              }
+            }}
+            disabled={store.time.isPaused || store.player.health.energy < 15}
+            className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
+          >
+            <div className="text-lg">🔧</div>
+            <div className="text-xs">서버점검</div>
+          </button>
+        </div>
+
+        {/* Skills */}
+        <div className="bg-gray-800/30 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm font-semibold">스킬</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            {Object.entries(store.player.skills).map(([skill, value]) => (
+              <div key={skill} className="bg-gray-700/30 rounded-lg p-2">
+                <div className="text-white font-bold">{Math.round(value)}</div>
+                <div className="text-gray-500 capitalize">
+                  {skill === 'coding' && '코딩'}
+                  {skill === 'design' && '디자인'}
+                  {skill === 'marketing' && '마케팅'}
+                  {skill === 'business' && '비즈니스'}
+                  {skill === 'communication' && '소통'}
+                  {skill === 'leadership' && '리더십'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* Task Selection Modal */}
+      {showTaskModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">🎮 게임 방법</h2>
-            <div className="space-y-4 text-sm text-gray-300">
-              <div>
-                <h3 className="font-bold text-white mb-1">📊 관리해야 할 것들</h3>
-                <ul className="list-disc list-inside space-y-1">
-                  <li><strong>자금:</strong> 500만원으로 시작, 서버비/API 비용 지출</li>
-                  <li><strong>에너지:</strong> 일하면 소모, 휴식으로 회복</li>
-                  <li><strong>스트레스:</strong> 100이 되면 게임 오버!</li>
-                  <li><strong>서버 상태:</strong> 관리 안 하면 다운됨</li>
-                  <li><strong>평판:</strong> 0이 되면 게임 오버!</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-1">🎲 게임 오버 조건</h3>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>자금 -100만원 이하 (파산)</li>
-                  <li>서버 상태 0 (완전 다운)</li>
-                  <li>평판 0 (악평 확산)</li>
-                  <li>스트레스 100 (번아웃)</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-1">🎯 팁</h3>
-                <p>랜덤 이벤트에 현명하게 대응하고, 에너지와 자금 관리를 잘 해서 최대한 오래 생존하세요!</p>
-              </div>
+          <div className="bg-gray-800 rounded-2xl p-5 max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <h2 className="text-xl font-bold mb-4">업무 선택</h2>
+
+            {/* Category Tabs */}
+            <div className="grid grid-cols-5 gap-2 mb-4">
+              <CategoryButton
+                category="development"
+                icon={<span>💻</span>}
+                label="개발"
+                selected={selectedTaskCategory === 'development'}
+                onClick={() => setSelectedTaskCategory('development')}
+              />
+              <CategoryButton
+                category="marketing"
+                icon={<span>📢</span>}
+                label="마케팅"
+                selected={selectedTaskCategory === 'marketing'}
+                onClick={() => setSelectedTaskCategory('marketing')}
+              />
+              <CategoryButton
+                category="customer_support"
+                icon={<span>💬</span>}
+                label="고객지원"
+                selected={selectedTaskCategory === 'customer_support'}
+                onClick={() => setSelectedTaskCategory('customer_support')}
+              />
+              <CategoryButton
+                category="business"
+                icon={<span>💼</span>}
+                label="비즈니스"
+                selected={selectedTaskCategory === 'business'}
+                onClick={() => setSelectedTaskCategory('business')}
+              />
+              <CategoryButton
+                category="personal"
+                icon={<span>🧘</span>}
+                label="개인"
+                selected={selectedTaskCategory === 'personal'}
+                onClick={() => setSelectedTaskCategory('personal')}
+              />
             </div>
+
+            {/* Task List */}
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {filteredTasks.map(task => {
+                const canAfford =
+                  store.player.health.energy >= task.requirements.energy &&
+                  (!task.requirements.money || store.business.finance.cash >= task.requirements.money);
+
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => handleTaskSelect(task)}
+                    disabled={!canAfford}
+                    className={`w-full p-4 rounded-xl text-left transition-all ${
+                      canAfford
+                        ? 'bg-gray-700/50 hover:bg-gray-700'
+                        : 'bg-gray-800/50 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-bold flex items-center gap-2">
+                          <span>{task.icon}</span>
+                          {task.name}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">{task.description}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-2 text-xs">
+                      <span className={`${store.player.health.energy >= task.requirements.energy ? 'text-emerald-400' : 'text-red-400'}`}>
+                        ⚡ {task.requirements.energy}
+                      </span>
+                      <span className="text-gray-400">
+                        🕐 {task.estimatedHours}시간
+                      </span>
+                      {task.requirements.money && (
+                        <span className={`${store.business.finance.cash >= task.requirements.money ? 'text-emerald-400' : 'text-red-400'}`}>
+                          💰 {formatMoney(task.requirements.money)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
             <Button
-              onClick={() => setShowHelp(false)}
-              className="w-full mt-4"
-              variant="gradient"
+              onClick={() => setShowTaskModal(false)}
+              variant="outline"
+              className="mt-4"
             >
-              확인
+              닫기
             </Button>
           </div>
         </div>
       )}
 
       {/* Event Modal */}
-      {state.currentEvent && (
+      {store.currentEvent && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className={`bg-gradient-to-br ${
-            state.currentEvent.severity === 'critical' ? 'from-red-900/90 to-red-950/90 border-red-500/50' :
-            state.currentEvent.severity === 'warning' ? 'from-amber-900/90 to-amber-950/90 border-amber-500/50' :
-            state.currentEvent.severity === 'good' ? 'from-emerald-900/90 to-emerald-950/90 border-emerald-500/50' :
+            store.currentEvent.severity === 'critical' ? 'from-red-900/90 to-red-950/90 border-red-500/50' :
+            store.currentEvent.severity === 'warning' ? 'from-amber-900/90 to-amber-950/90 border-amber-500/50' :
+            store.currentEvent.severity === 'good' ? 'from-emerald-900/90 to-emerald-950/90 border-emerald-500/50' :
             'from-blue-900/90 to-blue-950/90 border-blue-500/50'
           } border rounded-2xl p-5 max-w-sm w-full`}>
-            <h2 className="text-xl font-bold mb-2">{state.currentEvent.title}</h2>
-            <p className="text-sm text-gray-300 mb-4">{state.currentEvent.description}</p>
+            <h2 className="text-xl font-bold mb-2">
+              {store.currentEvent.icon} {store.currentEvent.title}
+            </h2>
+            <p className="text-sm text-gray-300 mb-4">{store.currentEvent.description}</p>
             <div className="space-y-2">
-              {state.currentEvent.choices.map((choice, i) => (
+              {store.currentEvent.choices.map((choice, i) => (
                 <button
                   key={i}
-                  onClick={() => handleChoice(choice)}
+                  onClick={() => handleEventChoice(choice)}
                   className="w-full p-3 bg-gray-800/80 hover:bg-gray-700 rounded-xl text-left text-sm transition-all active:scale-98"
                 >
                   {choice.text}
@@ -545,15 +665,38 @@ export default function SimulatorPage() {
         </div>
       )}
 
-      {/* Result Modal */}
-      {state.showResult && (
+      {/* Help Modal */}
+      {showHelpModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-2xl p-5 max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-3">📋 결과</h3>
-            <p className="text-sm text-gray-300 mb-4">{state.showResult}</p>
+          <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">게임 방법</h2>
+            <div className="space-y-4 text-sm text-gray-300">
+              <div>
+                <h3 className="font-bold text-white mb-1">게임 목표</h3>
+                <p>VocaVision 서비스를 성공적으로 운영하여 프리미엄 사용자 1,000명을 확보하거나 현금 1억원을 모으세요!</p>
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-1">관리해야 할 것들</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>에너지:</strong> 업무 수행에 필요, 휴식으로 회복</li>
+                  <li><strong>스트레스:</strong> 100이 되면 번아웃!</li>
+                  <li><strong>서버 상태:</strong> 0이 되면 서비스 중단!</li>
+                  <li><strong>평판:</strong> 0이 되면 게임 오버!</li>
+                  <li><strong>자금:</strong> -100만원이 되면 파산!</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-bold text-white mb-1">팁</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>에너지를 잘 관리하며 업무를 선택하세요</li>
+                  <li>랜덤 이벤트에 현명하게 대응하세요</li>
+                  <li>개발과 마케팅의 균형을 맞추세요</li>
+                </ul>
+              </div>
+            </div>
             <Button
-              onClick={() => setState(p => ({ ...p, showResult: null }))}
-              className="w-full"
+              onClick={() => setShowHelpModal(false)}
+              className="w-full mt-4"
               variant="gradient"
             >
               확인
@@ -562,24 +705,106 @@ export default function SimulatorPage() {
         </div>
       )}
 
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">설정</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 mb-2 block">게임 속도</label>
+                <div className="flex gap-2">
+                  {[1, 2, 4].map(speed => (
+                    <button
+                      key={speed}
+                      onClick={() => store.setSpeed(speed as 1 | 2 | 4)}
+                      className={`flex-1 p-2 rounded-lg ${
+                        store.time.speed === speed
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-gray-700 text-gray-400'
+                      }`}
+                    >
+                      {speed}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    store.saveGame(1);
+                    alert('저장 완료!');
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  저장
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (confirm('저장된 게임을 불러올까요?')) {
+                      store.loadGame(1);
+                    }
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  불러오기
+                </Button>
+              </div>
+
+              <Button
+                onClick={() => {
+                  if (confirm('게임을 다시 시작할까요? 저장되지 않은 진행 상황은 사라집니다.')) {
+                    store.resetGame();
+                    setShowSettingsModal(false);
+                    setShowDifficultyModal(true);
+                  }
+                }}
+                variant="outline"
+                className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                새 게임
+              </Button>
+            </div>
+
+            <Button
+              onClick={() => setShowSettingsModal(false)}
+              className="w-full mt-4"
+              variant="gradient"
+            >
+              닫기
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Game Over Modal */}
-      {state.gameOver && (
+      {store.gameOver && !store.victory && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full">
             <h2 className="text-2xl font-black text-red-400 mb-3 flex items-center gap-2">
               <Trophy className="w-6 h-6" /> 게임 오버
             </h2>
-            <p className="text-sm text-gray-300 mb-4">{state.gameOverReason}</p>
+            <p className="text-sm text-gray-300 mb-4">{store.gameOverReason}</p>
             <div className="bg-gray-700/50 rounded-xl p-3 mb-4 text-xs">
               <div className="grid grid-cols-2 gap-2">
-                <div>생존 일수: <span className="text-white font-bold">{state.day}일</span></div>
-                <div>최종 사용자: <span className="text-white font-bold">{state.users}명</span></div>
-                <div>총 수익: <span className="text-emerald-400">{formatMoney(state.stats.totalRevenue)}</span></div>
-                <div>총 지출: <span className="text-red-400">{formatMoney(state.stats.totalExpenses)}</span></div>
+                <div>생존 일수: <span className="text-white font-bold">{store.time.totalDays}일</span></div>
+                <div>최종 사용자: <span className="text-white font-bold">{formatNumber(store.business.users.total)}명</span></div>
+                <div>프리미엄: <span className="text-amber-400">{formatNumber(store.business.users.premium)}명</span></div>
+                <div>최종 잔고: <span className={store.business.finance.cash >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatMoney(store.business.finance.cash)}</span></div>
               </div>
             </div>
             <Button
-              onClick={() => setState(INITIAL_STATE)}
+              onClick={() => {
+                store.resetGame();
+                setShowDifficultyModal(true);
+              }}
               className="w-full"
               variant="gradient"
             >
@@ -590,8 +815,57 @@ export default function SimulatorPage() {
         </div>
       )}
 
-      <div className="text-center text-xs text-gray-600 mt-4">
-        💡 에너지/자금/평판/서버 관리가 핵심! 0이 되면 게임 오버
+      {/* Victory Modal */}
+      {store.victory && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-amber-800 to-amber-900 border border-amber-500/50 rounded-2xl p-6 max-w-sm w-full">
+            <h2 className="text-2xl font-black text-amber-400 mb-3 flex items-center gap-2">
+              <Trophy className="w-6 h-6" /> 축하합니다!
+            </h2>
+            <p className="text-sm text-gray-200 mb-2">
+              {store.victoryType === 'users' && '1,000명의 프리미엄 사용자를 확보했습니다!'}
+              {store.victoryType === 'money' && '1억원의 현금을 모았습니다!'}
+              {store.victoryType === 'acquisition' && '대기업에 인수되었습니다!'}
+            </p>
+            <p className="text-xs text-amber-200 mb-4">VocaVision을 성공적인 EdTech 서비스로 성장시켰습니다!</p>
+            <div className="bg-gray-700/50 rounded-xl p-3 mb-4 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>총 일수: <span className="text-white font-bold">{store.time.totalDays}일</span></div>
+                <div>최종 사용자: <span className="text-white font-bold">{formatNumber(store.business.users.total)}명</span></div>
+                <div>프리미엄: <span className="text-amber-400">{formatNumber(store.business.users.premium)}명</span></div>
+                <div>최종 잔고: <span className="text-emerald-400">{formatMoney(store.business.finance.cash)}</span></div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  store.resetGame();
+                  setShowDifficultyModal(true);
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                새 게임
+              </Button>
+              <Button
+                onClick={() => {
+                  // Continue playing
+                  store.continueAfterVictory();
+                }}
+                variant="gradient"
+                className="flex-1"
+              >
+                계속 플레이
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer tip */}
+      <div className="text-center text-xs text-gray-600 py-4">
+        에너지/스트레스/서버/평판/자금 관리가 핵심!
       </div>
     </div>
   );
