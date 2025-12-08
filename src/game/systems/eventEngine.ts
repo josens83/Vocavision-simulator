@@ -844,3 +844,100 @@ export function generateDailyEvent(state: GameState): GameEvent | null {
 
   return convertToGameEvent(event);
 }
+
+// ============================================
+// Enhanced Event Engine (Chapter 3 통합)
+// ============================================
+
+// Enhanced 이벤트 사용 플래그
+let useEnhancedEvents = false;
+let enhancedEvents: EventProbability[] | null = null;
+
+// Enhanced 이벤트 활성화
+export function enableEnhancedEvents(events: EventProbability[]): void {
+  useEnhancedEvents = true;
+  enhancedEvents = events;
+}
+
+// Enhanced 이벤트로 체크
+export function checkForEnhancedEvent(state: GameState): ProbabilisticEvent | null {
+  const eventsToUse = useEnhancedEvents && enhancedEvents ? enhancedEvents : PROBABILISTIC_EVENTS;
+
+  // 기본 이벤트 발생 확률
+  if (Math.random() > DAILY_EVENT_CHANCE) {
+    return null;
+  }
+
+  // 카테고리 가중치 조정
+  const weights = adjustCategoryWeights(state);
+  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+
+  // 카테고리 선택
+  let roll = Math.random() * totalWeight;
+  let selectedCategory: EventCategory | null = null;
+
+  for (const [category, weight] of Object.entries(weights) as [EventCategory, number][]) {
+    roll -= weight;
+    if (roll <= 0) {
+      selectedCategory = category;
+      break;
+    }
+  }
+
+  if (!selectedCategory) return null;
+
+  // 해당 카테고리의 이벤트 목록
+  const categoryData = eventsToUse.find(e => e.category === selectedCategory);
+  if (!categoryData) return null;
+
+  // 조건을 만족하고 확률을 통과하는 이벤트 선택
+  const eligibleEvents = categoryData.events.filter(event => {
+    // 최소 일 수 체크
+    if (event.minDay && state.time.totalDays < event.minDay) return false;
+
+    // 조건 체크
+    if (event.condition && !event.condition(state)) return false;
+
+    // 확률 체크
+    const probability = event.probability(state);
+    return Math.random() < probability;
+  });
+
+  if (eligibleEvents.length === 0) return null;
+
+  // 랜덤 선택
+  return eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
+}
+
+// Enhanced 일일 이벤트 생성
+export function generateEnhancedDailyEvent(state: GameState): GameEvent | null {
+  const event = checkForEnhancedEvent(state);
+  if (!event) return null;
+
+  return convertToGameEvent(event);
+}
+
+// 이벤트 통계
+export function getEventStatistics(): {
+  baseEventsCount: number;
+  enhancedEventsCount: number;
+  isEnhanced: boolean;
+} {
+  let baseCount = 0;
+  for (const cat of PROBABILISTIC_EVENTS) {
+    baseCount += cat.events.length;
+  }
+
+  let enhancedCount = 0;
+  if (enhancedEvents) {
+    for (const cat of enhancedEvents) {
+      enhancedCount += cat.events.length;
+    }
+  }
+
+  return {
+    baseEventsCount: baseCount,
+    enhancedEventsCount: enhancedCount,
+    isEnhanced: useEnhancedEvents,
+  };
+}
