@@ -29,6 +29,9 @@ export {
 // Components
 export * from './components';
 
+// Modals
+export * from './modals';
+
 // Animations
 export * from './animations';
 export {

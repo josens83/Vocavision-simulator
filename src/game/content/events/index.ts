@@ -6,6 +6,7 @@
 import { TECHNICAL_EVENTS } from './technicalEvents';
 import { BUSINESS_EVENTS } from './businessEvents';
 import { USER_EVENTS, PERSONAL_EVENTS } from './userPersonalEvents';
+import { MARKET_EVENTS } from './marketEvents';
 import type { ProbabilisticEvent, EventCategory, EventProbability } from '../../systems/eventEngine';
 
 // 모든 이벤트 통합
@@ -14,6 +15,7 @@ export const ALL_EVENTS = {
   business: BUSINESS_EVENTS,
   user: USER_EVENTS,
   personal: PERSONAL_EVENTS,
+  market: MARKET_EVENTS,
 };
 
 // 카테고리별 이벤트 확률 데이터
@@ -30,13 +32,18 @@ export const ENHANCED_PROBABILISTIC_EVENTS: EventProbability[] = [
   },
   {
     category: 'user',
-    baseWeight: 30,
+    baseWeight: 25,
     events: USER_EVENTS,
   },
   {
     category: 'personal',
     baseWeight: 15,
     events: PERSONAL_EVENTS,
+  },
+  {
+    category: 'market',
+    baseWeight: 15,
+    events: MARKET_EVENTS,
   },
 ];
 
@@ -45,7 +52,8 @@ export const TOTAL_EVENT_COUNT =
   TECHNICAL_EVENTS.length +
   BUSINESS_EVENTS.length +
   USER_EVENTS.length +
-  PERSONAL_EVENTS.length;
+  PERSONAL_EVENTS.length +
+  MARKET_EVENTS.length;
 
 // 카테고리별 이벤트 개수
 export const EVENT_COUNTS = {
@@ -53,6 +61,7 @@ export const EVENT_COUNTS = {
   business: BUSINESS_EVENTS.length,
   user: USER_EVENTS.length,
   personal: PERSONAL_EVENTS.length,
+  market: MARKET_EVENTS.length,
   total: TOTAL_EVENT_COUNT,
 };
 
@@ -77,6 +86,7 @@ export function getEventsBySeverity(severity: 'critical' | 'warning' | 'good' | 
     ...BUSINESS_EVENTS,
     ...USER_EVENTS,
     ...PERSONAL_EVENTS,
+    ...MARKET_EVENTS,
   ];
   return allEvents.filter(e => e.severity === severity);
 }
@@ -88,10 +98,11 @@ export function getRandomEvent(): ProbabilisticEvent {
     ...BUSINESS_EVENTS,
     ...USER_EVENTS,
     ...PERSONAL_EVENTS,
+    ...MARKET_EVENTS,
   ];
   return allEvents[Math.floor(Math.random() * allEvents.length)];
 }
 
 // 익스포트
-export { TECHNICAL_EVENTS, BUSINESS_EVENTS, USER_EVENTS, PERSONAL_EVENTS };
+export { TECHNICAL_EVENTS, BUSINESS_EVENTS, USER_EVENTS, PERSONAL_EVENTS, MARKET_EVENTS };
 export default ENHANCED_PROBABILISTIC_EVENTS;

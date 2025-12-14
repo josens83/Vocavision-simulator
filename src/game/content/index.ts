@@ -56,6 +56,25 @@ export type {
   StoryProgress,
 } from './storyArcs';
 
+// Achievements
+export * from './achievements';
+export {
+  ACHIEVEMENTS,
+  ACHIEVEMENT_STATS,
+  getAchievementById,
+  getAchievementsByCategory,
+  getAchievementsByRarity,
+  checkUnlockableAchievements,
+  calculateTotalPoints,
+  getCategoryLabel,
+  getRarityLabel,
+} from './achievements';
+export type {
+  Achievement,
+  AchievementCategory,
+  AchievementReward,
+} from './achievements';
+
 // Content Statistics
 export const CONTENT_STATISTICS = {
   totalEvents: 0, // Will be calculated at runtime
