@@ -68,6 +68,7 @@ interface GameStore extends GameState {
   // Game control
   initGame: (difficulty: Difficulty) => void;
   initializeGame: (difficulty: Difficulty) => void;
+  initGamePlus: (previousStats: NewGamePlusStats) => void;
   checkGameOver: () => void;
   checkVictory: () => void;
   saveGame: (slot: number, name?: string) => void;
@@ -79,6 +80,18 @@ interface GameStore extends GameState {
   recordDecision: (eventId: string, choiceId: string, outcome: string) => void;
   recordFinancial: (description: string) => void;
   takeMetricsSnapshot: () => void;
+}
+
+// NG+ 통계 인터페이스
+export interface NewGamePlusStats {
+  previousTier: number;
+  previousScore: number;
+  previousDays: number;
+  previousDifficulty: Difficulty;
+  // 이전 회차에서 이월되는 보너스
+  skillBonus: number;  // 스킬 레벨 보너스 (0-20)
+  cashBonus: number;   // 추가 시작 자금
+  reputationBonus: number;  // 추가 평판
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -603,6 +616,86 @@ export const useGameStore = create<GameStore>()(
 
       initializeGame: (difficulty) => {
         get().initGame(difficulty);
+      },
+
+      // New Game Plus 초기화
+      initGamePlus: (previousStats) => {
+        const nextTier = previousStats.previousTier + 1;
+        const baseDifficulty = previousStats.previousDifficulty;
+        const settings = DIFFICULTY_SETTINGS[baseDifficulty];
+
+        // NG+ 보너스 계산
+        const tierMultiplier = 1 + (nextTier * 0.1); // 회차당 10% 보너스
+        const bonusCash = settings.startingCash * 0.5 + previousStats.cashBonus; // 기본 자금 50% + 이월 보너스
+        const bonusSkill = Math.min(20, previousStats.skillBonus + 5); // 회차당 스킬 +5 (최대 20)
+        const bonusReputation = Math.min(50, previousStats.reputationBonus + 10); // 회차당 평판 +10 (최대 50)
+
+        // 이월 스킬 적용
+        const enhancedSkills = {
+          coding: INITIAL_PLAYER_STATS.skills.coding + bonusSkill,
+          design: INITIAL_PLAYER_STATS.skills.design + bonusSkill,
+          marketing: INITIAL_PLAYER_STATS.skills.marketing + bonusSkill,
+          business: INITIAL_PLAYER_STATS.skills.business + bonusSkill,
+          communication: INITIAL_PLAYER_STATS.skills.communication + bonusSkill,
+          leadership: INITIAL_PLAYER_STATS.skills.leadership + bonusSkill,
+        };
+
+        set({
+          meta: {
+            version: '1.0.0',
+            saveDate: new Date(),
+            playTime: 0,
+            difficulty: baseDifficulty,
+            saveName: `NG+ ${nextTier}회차`,
+            slot: 0,
+            ngPlusTier: nextTier,
+          },
+          time: { ...INITIAL_TIME_STATE, currentDate: new Date(), isPaused: false },
+          player: {
+            ...INITIAL_PLAYER_STATS,
+            skills: enhancedSkills,
+            social: {
+              ...INITIAL_PLAYER_STATS.social,
+              reputation: INITIAL_PLAYER_STATS.social.reputation + bonusReputation,
+            },
+          },
+          business: {
+            ...INITIAL_BUSINESS_METRICS,
+            finance: {
+              ...INITIAL_BUSINESS_METRICS.finance,
+              cash: settings.startingCash + bonusCash,
+            },
+          },
+          progress: {
+            completedEvents: [],
+            unlockedFeatures: ['words101', 'flashcards', 'ng_plus_bonus'],
+            achievements: [`ng_plus_${nextTier}`],
+            milestones: [`started_ng_plus_${nextTier}`],
+          },
+          currentEvent: null,
+          activeTask: null,
+          notifications: [{
+            id: generateId(),
+            type: 'success',
+            title: `🎮 ${nextTier}회차 시작!`,
+            message: `NG+ 보너스: 스킬 +${bonusSkill}, 자금 +${Math.round(bonusCash / 10000)}만원, 평판 +${bonusReputation}`,
+            timestamp: Date.now(),
+            read: false,
+          }],
+          scheduledEvents: [],
+          delayedEffects: [],
+          gameOver: false,
+          gameOverReason: '',
+          victory: false,
+          victoryType: undefined,
+          history: {
+            decisions: [],
+            financialHistory: [],
+            metricsSnapshots: [],
+          },
+        });
+
+        get().takeMetricsSnapshot();
       },
 
       checkGameOver: () => {

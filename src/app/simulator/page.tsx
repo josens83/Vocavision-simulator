@@ -16,6 +16,7 @@ import {
   Task, TaskCategory, GameEvent, DecisionOption,
   DayPhase, Difficulty
 } from '@/game/types';
+import { GameProvider, useGame } from '@/game/providers/GameProvider';
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + '원';
@@ -97,18 +98,42 @@ const CategoryButton = ({
   </button>
 );
 
+// Main simulator page wrapper with GameProvider
 export default function SimulatorPage() {
+  return (
+    <GameProvider enableDebug={true} enableTutorial={true}>
+      <SimulatorContent />
+    </GameProvider>
+  );
+}
+
+// Actual simulator content
+function SimulatorContent() {
   const store = useGameStore();
+  const game = useGame();
+
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDifficultyModal, setShowDifficultyModal] = useState(true);
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<TaskCategory>('development');
-  const [showSaveSlots, setShowSaveSlots] = useState(false);
-  const [showLoadSlots, setShowLoadSlots] = useState(false);
 
-  // Initialize game on mount
+  // Initialize game on mount - check for NG+ data
   useEffect(() => {
+    // Check for NG+ data first
+    const ngPlusData = localStorage.getItem('vocavision_ngplus_data');
+    if (ngPlusData) {
+      try {
+        const ngPlusStats = JSON.parse(ngPlusData);
+        localStorage.removeItem('vocavision_ngplus_data'); // 사용 후 제거
+        store.initGamePlus(ngPlusStats);
+        setShowDifficultyModal(false);
+        return;
+      } catch (e) {
+        console.error('NG+ 데이터 파싱 실패:', e);
+        localStorage.removeItem('vocavision_ngplus_data');
+      }
+    }
+
     // Check if game has been initialized
     if (store.time.totalDays === 0) {
       setShowDifficultyModal(true);
@@ -253,8 +278,13 @@ export default function SimulatorPage() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-lg font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">
+                <h1 className="text-lg font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
                   VocaVision
+                  {(store.meta as any)?.ngPlusTier > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full">
+                      NG+{(store.meta as any).ngPlusTier}
+                    </span>
+                  )}
                 </h1>
                 <p className="text-xs text-gray-500">1인 EdTech 시뮬레이터</p>
               </div>
@@ -284,7 +314,7 @@ export default function SimulatorPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowSettingsModal(true)}
+                onClick={game.showSettingsModal}
                 className="text-gray-400 hover:text-white"
               >
                 <Settings className="w-5 h-5" />
@@ -686,6 +716,12 @@ export default function SimulatorPage() {
                 </ul>
               </div>
               <div>
+                <h3 className="font-bold text-white mb-1">단축키</h3>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>Ctrl+Shift+D:</strong> 디버그 패널 열기</li>
+                </ul>
+              </div>
+              <div>
                 <h3 className="font-bold text-white mb-1">팁</h3>
                 <ul className="list-disc list-inside space-y-1">
                   <li>에너지를 잘 관리하며 업무를 선택하세요</li>
@@ -700,85 +736,6 @@ export default function SimulatorPage() {
               variant="gradient"
             >
               확인
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">설정</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-400 mb-2 block">게임 속도</label>
-                <div className="flex gap-2">
-                  {[1, 2, 4].map(speed => (
-                    <button
-                      key={speed}
-                      onClick={() => store.setSpeed(speed as 1 | 2 | 4)}
-                      className={`flex-1 p-2 rounded-lg ${
-                        store.time.speed === speed
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-gray-700 text-gray-400'
-                      }`}
-                    >
-                      {speed}x
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    store.saveGame(1);
-                    alert('저장 완료!');
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  저장
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (confirm('저장된 게임을 불러올까요?')) {
-                      store.loadGame(1);
-                    }
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  불러오기
-                </Button>
-              </div>
-
-              <Button
-                onClick={() => {
-                  if (confirm('게임을 다시 시작할까요? 저장되지 않은 진행 상황은 사라집니다.')) {
-                    store.resetGame();
-                    setShowSettingsModal(false);
-                    setShowDifficultyModal(true);
-                  }
-                }}
-                variant="outline"
-                className="w-full text-red-400 border-red-500/30 hover:bg-red-500/10"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                새 게임
-              </Button>
-            </div>
-
-            <Button
-              onClick={() => setShowSettingsModal(false)}
-              className="w-full mt-4"
-              variant="gradient"
-            >
-              닫기
             </Button>
           </div>
         </div>
@@ -815,7 +772,7 @@ export default function SimulatorPage() {
         </div>
       )}
 
-      {/* Victory Modal */}
+      {/* Victory Modal - Now handled by GameProvider's EndingScreen */}
       {store.victory && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-amber-800 to-amber-900 border border-amber-500/50 rounded-2xl p-6 max-w-sm w-full">
@@ -865,7 +822,7 @@ export default function SimulatorPage() {
 
       {/* Footer tip */}
       <div className="text-center text-xs text-gray-600 py-4">
-        에너지/스트레스/서버/평판/자금 관리가 핵심!
+        에너지/스트레스/서버/평판/자금 관리가 핵심! • Ctrl+Shift+D: 디버그
       </div>
     </div>
   );

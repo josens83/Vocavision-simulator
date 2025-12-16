@@ -190,10 +190,27 @@ export function GameProvider({
   }, []);
 
   const handleEndingNewGamePlus = useCallback(() => {
-    // TODO: Implement NG+ logic
+    // NG+ 로직 구현
+    const currentTier = (store.meta as any)?.ngPlusTier || 0;
+    const currentDifficulty = store.meta?.difficulty || 'normal';
+
+    // NG+ 통계 계산
+    const ngPlusStats = {
+      previousTier: currentTier,
+      previousScore: endingData?.stats?.totalScore || 0,
+      previousDays: store.time?.totalDays || 0,
+      previousDifficulty: currentDifficulty as any,
+      skillBonus: Math.min(20, currentTier * 5),
+      cashBonus: Math.min(5000000, (endingData?.stats?.totalScore || 0) * 100),
+      reputationBonus: Math.min(50, currentTier * 10),
+    };
+
+    // localStorage에 NG+ 데이터 저장
+    localStorage.setItem('vocavision_ngplus_data', JSON.stringify(ngPlusStats));
+
     setEndingData(null);
     window.location.reload();
-  }, []);
+  }, [store.meta, store.time?.totalDays, endingData]);
 
   const handleEndingMainMenu = useCallback(() => {
     setEndingData(null);
