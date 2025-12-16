@@ -381,6 +381,7 @@ export interface GameSaveMeta {
   difficulty: Difficulty;
   saveName: string;
   slot: number;
+  ngPlusTier?: number; // New Game Plus 회차 (0 = 첫 회차)
 }
 
 export interface GameHistory {

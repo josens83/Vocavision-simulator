@@ -26,6 +26,12 @@
 export { GameProvider, useGame } from './providers';
 
 // ============================================
+// Game Store
+// ============================================
+
+export { useGameStore, type NewGamePlusStats } from './store/gameStore';
+
+// ============================================
 // System Integration
 // ============================================
 
