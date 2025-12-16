@@ -198,6 +198,10 @@ export const enUSTranslations: TranslationDictionary = {
   'achievement.investment': 'Investment Secured',
   'achievement.description.first_user': 'Acquired your first user!',
   'achievement.description.first_revenue': 'Earned your first revenue!',
+  'achievement.list_title': 'Achievements',
+  'achievement.total_points': 'Total Points',
+  'achievement.locked_desc': 'Unlock this achievement to reveal details.',
+  'achievement.unlocked': 'Achievement Unlocked!',
 
   // ============================================
   // Endings
@@ -341,6 +345,97 @@ export const enUSTranslations: TranslationDictionary = {
   'number.million': 'M',
   'number.billion': 'B',
   'number.trillion': 'T',
+
+  // ============================================
+  // Simulator UI
+  // ============================================
+  'ui.title': 'VocaVision',
+  'ui.subtitle': 'Solo EdTech Simulator',
+  'ui.task.select': 'Select Task',
+  'ui.task.select_button': 'Select Task',
+  'ui.task.in_progress': 'Task in Progress',
+  'ui.task.category.development': 'Development',
+  'ui.task.category.marketing': 'Marketing',
+  'ui.task.category.customer_support': 'Customer Support',
+  'ui.task.category.business': 'Business',
+  'ui.task.category.personal': 'Personal',
+
+  'ui.player.status': 'Player Status',
+  'ui.player.energy': 'Energy',
+  'ui.player.stress': 'Stress',
+  'ui.player.physical': 'Physical',
+  'ui.player.mental': 'Mental',
+
+  'ui.business.status': 'Business Status',
+  'ui.business.balance': 'Balance',
+  'ui.business.users': 'Users',
+  'ui.business.premium': 'Premium',
+  'ui.business.reputation': 'Reputation',
+  'ui.business.monthly_revenue': 'Monthly Revenue',
+  'ui.business.monthly_cost': 'Monthly Cost',
+  'ui.business.net_profit': 'Net Profit',
+  'ui.business.server_status': 'Server Status',
+  'ui.business.product_stability': 'Product Stability',
+
+  'ui.action.rest': 'Rest',
+  'ui.action.exercise': 'Exercise',
+  'ui.action.marketing': 'Marketing',
+  'ui.action.server_check': 'Server Check',
+
+  'ui.difficulty.title': 'VocaVision Simulator',
+  'ui.difficulty.subtitle': 'Solo EdTech Startup Simulator',
+  'ui.difficulty.easy': 'Easy',
+  'ui.difficulty.easy_desc': 'Starting funds ₩10M, relaxed start',
+  'ui.difficulty.normal': 'Normal',
+  'ui.difficulty.normal_desc': 'Starting funds ₩5M, balanced challenge',
+  'ui.difficulty.hard': 'Hard',
+  'ui.difficulty.hard_desc': 'Starting funds ₩2M, survival is the goal',
+  'ui.difficulty.realistic': 'Realistic',
+  'ui.difficulty.realistic_desc': 'Starting funds ₩1M, real startup experience',
+
+  'ui.help.title': 'How to Play',
+  'ui.help.goal_title': 'Game Goal',
+  'ui.help.goal_desc': 'Successfully run VocaVision to acquire 1,000 premium users or accumulate ₩100M in cash!',
+  'ui.help.manage_title': 'Things to Manage',
+  'ui.help.manage_energy': 'Energy: Required for tasks, recover by resting',
+  'ui.help.manage_stress': 'Stress: At 100, you burn out!',
+  'ui.help.manage_server': 'Server Status: At 0, service stops!',
+  'ui.help.manage_reputation': 'Reputation: At 0, game over!',
+  'ui.help.manage_cash': 'Cash: At -₩1M, bankruptcy!',
+  'ui.help.tips_title': 'Tips',
+  'ui.help.tip1': 'Manage your energy wisely when selecting tasks',
+  'ui.help.tip2': 'Respond wisely to random events',
+  'ui.help.tip3': 'Balance development and marketing',
+
+  'ui.game_over.title': 'Game Over',
+  'ui.game_over.survival_days': 'Days Survived',
+  'ui.game_over.final_users': 'Final Users',
+  'ui.game_over.final_premium': 'Premium',
+  'ui.game_over.final_balance': 'Final Balance',
+  'ui.game_over.restart': 'Restart',
+
+  'ui.victory.title': 'Congratulations!',
+  'ui.victory.users_desc': 'You acquired 1,000 premium users!',
+  'ui.victory.money_desc': 'You accumulated ₩100M in cash!',
+  'ui.victory.acquisition_desc': 'You were acquired by a major company!',
+  'ui.victory.success_message': 'You grew VocaVision into a successful EdTech service!',
+  'ui.victory.total_days': 'Total Days',
+  'ui.victory.new_game': 'New Game',
+  'ui.victory.continue': 'Continue Playing',
+
+  'ui.skills': 'Skills',
+  'ui.skill.coding': 'Coding',
+  'ui.skill.design': 'Design',
+  'ui.skill.marketing': 'Marketing',
+  'ui.skill.business': 'Business',
+  'ui.skill.communication': 'Communication',
+  'ui.skill.leadership': 'Leadership',
+
+  'ui.footer.tip': 'Managing Energy/Stress/Server/Reputation/Cash is key!',
+  'ui.footer.debug': 'Ctrl+Shift+D: Debug',
+
+  'ui.alert.no_energy': 'Not enough energy!',
+  'ui.alert.no_money': 'Not enough funds!',
 
   // ============================================
   // Notifications

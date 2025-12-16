@@ -17,6 +17,9 @@ import {
   DayPhase, Difficulty
 } from '@/game/types';
 import { GameProvider, useGame } from '@/game/providers/GameProvider';
+import { useAudio, useTranslation } from '@/game/store/systemIntegration';
+import { AchievementList } from '@/game/ui/modals/AchievementPopup';
+import { ACHIEVEMENTS, calculateTotalPoints } from '@/game/content/achievements';
 
 const formatMoney = (amount: number) =>
   new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + '원';
@@ -75,16 +78,21 @@ const CategoryButton = ({
   icon,
   label,
   selected,
-  onClick
+  onClick,
+  onSound
 }: {
   category: TaskCategory;
   icon: React.ReactNode;
   label: string;
   selected: boolean;
   onClick: () => void;
+  onSound?: () => void;
 }) => (
   <button
-    onClick={onClick}
+    onClick={() => {
+      onSound?.();
+      onClick();
+    }}
     className={`p-2 rounded-lg text-xs transition-all ${
       selected
         ? 'bg-violet-600 text-white'
@@ -111,10 +119,13 @@ export default function SimulatorPage() {
 function SimulatorContent() {
   const store = useGameStore();
   const game = useGame();
+  const audio = useAudio();
+  const { t, formatCurrency } = useTranslation();
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showDifficultyModal, setShowDifficultyModal] = useState(true);
+  const [showAchievementsModal, setShowAchievementsModal] = useState(false);
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<TaskCategory>('development');
 
   // Initialize game on mount - check for NG+ data
@@ -157,35 +168,51 @@ function SimulatorContent() {
         });
         if (eligibleEvents.length > 0) {
           const randomEvent = eligibleEvents[Math.floor(Math.random() * eligibleEvents.length)];
+          // Play event sound based on severity
+          if (randomEvent.severity === 'critical') {
+            audio.game.eventCritical();
+          } else if (randomEvent.severity === 'good') {
+            audio.game.eventPositive();
+          } else {
+            audio.game.eventAppear();
+          }
           store.triggerEvent(randomEvent);
         }
       }
     }, store.time.speed === 1 ? 2000 : store.time.speed === 2 ? 1000 : 500);
 
     return () => clearInterval(interval);
-  }, [store.time.isPaused, store.gameOver, store.currentEvent, store.time.speed]);
+  }, [store.time.isPaused, store.gameOver, store.currentEvent, store.time.speed, audio]);
 
   const handleStartGame = useCallback((difficulty: Difficulty) => {
+    audio.ui.click();
+    audio.playMusic('main_theme');
     store.initializeGame(difficulty);
     setShowDifficultyModal(false);
-  }, [store]);
+  }, [store, audio]);
 
   const handleTaskSelect = useCallback((task: Task) => {
     if (store.player.health.energy < task.requirements.energy) {
-      alert('에너지가 부족합니다!');
+      audio.ui.error();
+      alert(t('ui.alert.no_energy'));
       return;
     }
     if (task.requirements.money && store.business.finance.cash < task.requirements.money) {
-      alert('자금이 부족합니다!');
+      audio.ui.error();
+      alert(t('ui.alert.no_money'));
       return;
     }
+    audio.ui.click();
+    audio.game.taskComplete();
     store.startTask(task);
     setShowTaskModal(false);
-  }, [store]);
+  }, [store, audio, t]);
 
   const handleEventChoice = useCallback((choice: DecisionOption) => {
+    audio.ui.click();
+    audio.ui.modalClose();
     store.handleEventChoice(choice);
-  }, [store]);
+  }, [store, audio]);
 
   const monthlyRevenue = store.business.users.premium * 9990;
   const monthlyCosts =
@@ -204,21 +231,22 @@ function SimulatorContent() {
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-md w-full">
             <h2 className="text-2xl font-black text-center mb-2">
-              VocaVision Simulator
+              {t('ui.difficulty.title')}
             </h2>
             <p className="text-gray-400 text-center text-sm mb-6">
-              1인 EdTech 사업 시뮬레이터
+              {t('ui.difficulty.subtitle')}
             </p>
 
             <div className="space-y-3">
               <button
                 onClick={() => handleStartGame('easy')}
+                onMouseEnter={() => audio.ui.hover()}
                 className="w-full p-4 bg-emerald-600/20 border border-emerald-500/30 rounded-xl text-left hover:bg-emerald-600/30 transition-all"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-emerald-400">쉬움</div>
-                    <div className="text-xs text-gray-400">초기 자금 1천만원, 여유로운 시작</div>
+                    <div className="font-bold text-emerald-400">{t('ui.difficulty.easy')}</div>
+                    <div className="text-xs text-gray-400">{t('ui.difficulty.easy_desc')}</div>
                   </div>
                   <span className="text-2xl">🌱</span>
                 </div>
@@ -226,12 +254,13 @@ function SimulatorContent() {
 
               <button
                 onClick={() => handleStartGame('normal')}
+                onMouseEnter={() => audio.ui.hover()}
                 className="w-full p-4 bg-blue-600/20 border border-blue-500/30 rounded-xl text-left hover:bg-blue-600/30 transition-all"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-blue-400">보통</div>
-                    <div className="text-xs text-gray-400">초기 자금 500만원, 균형잡힌 도전</div>
+                    <div className="font-bold text-blue-400">{t('ui.difficulty.normal')}</div>
+                    <div className="text-xs text-gray-400">{t('ui.difficulty.normal_desc')}</div>
                   </div>
                   <span className="text-2xl">⚖️</span>
                 </div>
@@ -239,12 +268,13 @@ function SimulatorContent() {
 
               <button
                 onClick={() => handleStartGame('hard')}
+                onMouseEnter={() => audio.ui.hover()}
                 className="w-full p-4 bg-amber-600/20 border border-amber-500/30 rounded-xl text-left hover:bg-amber-600/30 transition-all"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-amber-400">어려움</div>
-                    <div className="text-xs text-gray-400">초기 자금 200만원, 생존이 목표</div>
+                    <div className="font-bold text-amber-400">{t('ui.difficulty.hard')}</div>
+                    <div className="text-xs text-gray-400">{t('ui.difficulty.hard_desc')}</div>
                   </div>
                   <span className="text-2xl">🔥</span>
                 </div>
@@ -252,12 +282,13 @@ function SimulatorContent() {
 
               <button
                 onClick={() => handleStartGame('realistic')}
+                onMouseEnter={() => audio.ui.hover()}
                 className="w-full p-4 bg-red-600/20 border border-red-500/30 rounded-xl text-left hover:bg-red-600/30 transition-all"
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-bold text-red-400">현실</div>
-                    <div className="text-xs text-gray-400">초기 자금 100만원, 실제 창업 체험</div>
+                    <div className="font-bold text-red-400">{t('ui.difficulty.realistic')}</div>
+                    <div className="text-xs text-gray-400">{t('ui.difficulty.realistic_desc')}</div>
                   </div>
                   <span className="text-2xl">💀</span>
                 </div>
@@ -279,14 +310,14 @@ function SimulatorContent() {
               </Link>
               <div>
                 <h1 className="text-lg font-black bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
-                  VocaVision
+                  {t('ui.title')}
                   {(store.meta as any)?.ngPlusTier > 0 && (
                     <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full">
                       NG+{(store.meta as any).ngPlusTier}
                     </span>
                   )}
                 </h1>
-                <p className="text-xs text-gray-500">1인 EdTech 시뮬레이터</p>
+                <p className="text-xs text-gray-500">{t('ui.subtitle')}</p>
               </div>
             </div>
 
@@ -306,7 +337,23 @@ function SimulatorContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowHelpModal(true)}
+                onClick={() => {
+                  audio.ui.click();
+                  audio.ui.modalOpen();
+                  setShowAchievementsModal(true);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                <Trophy className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  audio.ui.click();
+                  audio.ui.modalOpen();
+                  setShowHelpModal(true);
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 <Info className="w-5 h-5" />
@@ -314,7 +361,11 @@ function SimulatorContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={game.showSettingsModal}
+                onClick={() => {
+                  audio.ui.click();
+                  audio.ui.modalOpen();
+                  game.showSettingsModal();
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 <Settings className="w-5 h-5" />
@@ -322,7 +373,10 @@ function SimulatorContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={store.togglePause}
+                onClick={() => {
+                  store.time.isPaused ? audio.ui.toggleOn() : audio.ui.toggleOff();
+                  store.togglePause();
+                }}
                 className="text-gray-400 hover:text-white"
               >
                 {store.time.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
@@ -340,22 +394,22 @@ function SimulatorContent() {
             <div className={`text-sm font-bold ${store.business.finance.cash < 500000 ? 'text-red-400' : 'text-emerald-400'}`}>
               {formatMoney(store.business.finance.cash)}
             </div>
-            <div className="text-xs text-gray-500">잔고</div>
+            <div className="text-xs text-gray-500">{t('ui.business.balance')}</div>
           </div>
           <div className="bg-gray-800/50 rounded-xl p-3 text-center">
             <Users className="w-5 h-5 mx-auto mb-1 text-blue-400" />
             <div className="text-sm font-bold">{formatNumber(store.business.users.total)}</div>
-            <div className="text-xs text-gray-500">사용자</div>
+            <div className="text-xs text-gray-500">{t('ui.business.users')}</div>
           </div>
           <div className="bg-gray-800/50 rounded-xl p-3 text-center">
             <Star className="w-5 h-5 mx-auto mb-1 text-amber-400" />
             <div className="text-sm font-bold text-amber-400">{formatNumber(store.business.users.premium)}</div>
-            <div className="text-xs text-gray-500">프리미엄</div>
+            <div className="text-xs text-gray-500">{t('ui.business.premium')}</div>
           </div>
           <div className="bg-gray-800/50 rounded-xl p-3 text-center">
             <TrendingUp className="w-5 h-5 mx-auto mb-1 text-purple-400" />
             <div className="text-sm font-bold">{store.player.social.reputation}</div>
-            <div className="text-xs text-gray-500">평판</div>
+            <div className="text-xs text-gray-500">{t('ui.business.reputation')}</div>
           </div>
         </div>
 
@@ -363,11 +417,11 @@ function SimulatorContent() {
         <div className="bg-gray-800/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Heart className="w-4 h-4 text-pink-400" />
-            <span className="text-sm font-semibold">플레이어 상태</span>
+            <span className="text-sm font-semibold">{t('ui.player.status')}</span>
           </div>
           <div className="grid grid-cols-2 gap-x-4">
             <StatBar
-              label="에너지"
+              label={t('ui.player.energy')}
               value={store.player.health.energy}
               max={100}
               color="bg-emerald-500"
@@ -375,14 +429,14 @@ function SimulatorContent() {
               warning
             />
             <StatBar
-              label="스트레스"
+              label={t('ui.player.stress')}
               value={store.player.health.stress}
               max={100}
               color="bg-red-500"
               icon={<AlertTriangle className="w-3 h-3" />}
             />
             <StatBar
-              label="체력"
+              label={t('ui.player.physical')}
               value={store.player.health.physical}
               max={100}
               color="bg-pink-500"
@@ -390,7 +444,7 @@ function SimulatorContent() {
               warning
             />
             <StatBar
-              label="정신력"
+              label={t('ui.player.mental')}
               value={store.player.health.mental}
               max={100}
               color="bg-blue-500"
@@ -404,29 +458,29 @@ function SimulatorContent() {
         <div className="bg-gray-800/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Briefcase className="w-4 h-4 text-violet-400" />
-            <span className="text-sm font-semibold">비즈니스 현황</span>
+            <span className="text-sm font-semibold">{t('ui.business.status')}</span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="bg-emerald-500/20 rounded-lg p-2">
               <div className="text-emerald-400 font-bold">{formatMoney(monthlyRevenue)}</div>
-              <div className="text-gray-500">월 수익</div>
+              <div className="text-gray-500">{t('ui.business.monthly_revenue')}</div>
             </div>
             <div className="bg-red-500/20 rounded-lg p-2">
               <div className="text-red-400 font-bold">{formatMoney(monthlyCosts)}</div>
-              <div className="text-gray-500">월 비용</div>
+              <div className="text-gray-500">{t('ui.business.monthly_cost')}</div>
             </div>
             <div className={`${monthlyProfit >= 0 ? 'bg-blue-500/20' : 'bg-orange-500/20'} rounded-lg p-2`}>
               <div className={`${monthlyProfit >= 0 ? 'text-blue-400' : 'text-orange-400'} font-bold`}>
                 {monthlyProfit >= 0 ? '+' : ''}{formatMoney(monthlyProfit)}
               </div>
-              <div className="text-gray-500">순이익</div>
+              <div className="text-gray-500">{t('ui.business.net_profit')}</div>
             </div>
           </div>
 
           {/* Infrastructure */}
           <div className="mt-3">
             <StatBar
-              label="서버 상태"
+              label={t('ui.business.server_status')}
               value={store.business.infrastructure.serverHealth}
               max={100}
               color="bg-blue-500"
@@ -434,7 +488,7 @@ function SimulatorContent() {
               warning
             />
             <StatBar
-              label="제품 안정성"
+              label={t('ui.business.product_stability')}
               value={store.business.product.stability}
               max={100}
               color="bg-purple-500"
@@ -449,7 +503,7 @@ function SimulatorContent() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-violet-400 animate-spin" />
-                <span className="text-sm font-semibold">진행 중인 업무</span>
+                <span className="text-sm font-semibold">{t('ui.task.in_progress')}</span>
               </div>
               <span className="text-xs text-gray-400">
                 {Math.round(store.activeTask.progress)}%
@@ -469,13 +523,17 @@ function SimulatorContent() {
         {/* Action Button */}
         {!store.activeTask && (
           <Button
-            onClick={() => setShowTaskModal(true)}
+            onClick={() => {
+              audio.ui.click();
+              audio.ui.modalOpen();
+              setShowTaskModal(true);
+            }}
             variant="gradient"
             className="w-full py-6 text-lg"
             disabled={store.time.isPaused}
           >
             <Briefcase className="w-5 h-5 mr-2" />
-            업무 선택하기
+            {t('ui.task.select_button')}
           </Button>
         )}
 
@@ -483,6 +541,7 @@ function SimulatorContent() {
         <div className="grid grid-cols-4 gap-2">
           <button
             onClick={() => {
+              audio.ui.click();
               store.applyEffects([{ type: 'energy', value: 30 }]);
               store.tick();
               store.tick();
@@ -491,11 +550,12 @@ function SimulatorContent() {
             className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
           >
             <div className="text-lg">😴</div>
-            <div className="text-xs">휴식</div>
+            <div className="text-xs">{t('ui.action.rest')}</div>
           </button>
           <button
             onClick={() => {
               if (store.player.health.energy >= 10) {
+                audio.ui.click();
                 store.applyEffects([
                   { type: 'energy', value: -10 },
                   { type: 'stress', value: -15 },
@@ -507,11 +567,13 @@ function SimulatorContent() {
             className="bg-pink-600 hover:bg-pink-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
           >
             <div className="text-lg">🏃</div>
-            <div className="text-xs">운동</div>
+            <div className="text-xs">{t('ui.action.exercise')}</div>
           </button>
           <button
             onClick={() => {
               if (store.business.finance.cash >= 100000) {
+                audio.ui.click();
+                audio.game.moneyLoss();
                 store.applyEffects([
                   { type: 'cash', value: -100000 },
                   { type: 'users', value: Math.floor(Math.random() * 20) + 10 },
@@ -523,11 +585,12 @@ function SimulatorContent() {
             className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
           >
             <div className="text-lg">📢</div>
-            <div className="text-xs">마케팅</div>
+            <div className="text-xs">{t('ui.action.marketing')}</div>
           </button>
           <button
             onClick={() => {
               if (store.player.health.energy >= 15) {
+                audio.ui.click();
                 store.applyEffects([
                   { type: 'energy', value: -15 },
                   { type: 'server_health', value: 20 },
@@ -538,7 +601,7 @@ function SimulatorContent() {
             className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 rounded-xl p-3 text-center transition-all active:scale-95"
           >
             <div className="text-lg">🔧</div>
-            <div className="text-xs">서버점검</div>
+            <div className="text-xs">{t('ui.action.server_check')}</div>
           </button>
         </div>
 
@@ -546,19 +609,14 @@ function SimulatorContent() {
         <div className="bg-gray-800/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Target className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-semibold">스킬</span>
+            <span className="text-sm font-semibold">{t('ui.skills')}</span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             {Object.entries(store.player.skills).map(([skill, value]) => (
               <div key={skill} className="bg-gray-700/30 rounded-lg p-2">
                 <div className="text-white font-bold">{Math.round(value)}</div>
                 <div className="text-gray-500 capitalize">
-                  {skill === 'coding' && '코딩'}
-                  {skill === 'design' && '디자인'}
-                  {skill === 'marketing' && '마케팅'}
-                  {skill === 'business' && '비즈니스'}
-                  {skill === 'communication' && '소통'}
-                  {skill === 'leadership' && '리더십'}
+                  {t(`ui.skill.${skill}`)}
                 </div>
               </div>
             ))}
@@ -570,44 +628,49 @@ function SimulatorContent() {
       {showTaskModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-2xl p-5 max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
-            <h2 className="text-xl font-bold mb-4">업무 선택</h2>
+            <h2 className="text-xl font-bold mb-4">{t('ui.task.select')}</h2>
 
             {/* Category Tabs */}
             <div className="grid grid-cols-5 gap-2 mb-4">
               <CategoryButton
                 category="development"
                 icon={<span>💻</span>}
-                label="개발"
+                label={t('ui.task.category.development')}
                 selected={selectedTaskCategory === 'development'}
                 onClick={() => setSelectedTaskCategory('development')}
+                onSound={audio.ui.tabSwitch}
               />
               <CategoryButton
                 category="marketing"
                 icon={<span>📢</span>}
-                label="마케팅"
+                label={t('ui.task.category.marketing')}
                 selected={selectedTaskCategory === 'marketing'}
                 onClick={() => setSelectedTaskCategory('marketing')}
+                onSound={audio.ui.tabSwitch}
               />
               <CategoryButton
                 category="customer_support"
                 icon={<span>💬</span>}
-                label="고객지원"
+                label={t('ui.task.category.customer_support')}
                 selected={selectedTaskCategory === 'customer_support'}
                 onClick={() => setSelectedTaskCategory('customer_support')}
+                onSound={audio.ui.tabSwitch}
               />
               <CategoryButton
                 category="business"
                 icon={<span>💼</span>}
-                label="비즈니스"
+                label={t('ui.task.category.business')}
                 selected={selectedTaskCategory === 'business'}
                 onClick={() => setSelectedTaskCategory('business')}
+                onSound={audio.ui.tabSwitch}
               />
               <CategoryButton
                 category="personal"
                 icon={<span>🧘</span>}
-                label="개인"
+                label={t('ui.task.category.personal')}
                 selected={selectedTaskCategory === 'personal'}
                 onClick={() => setSelectedTaskCategory('personal')}
+                onSound={audio.ui.tabSwitch}
               />
             </div>
 
@@ -621,7 +684,12 @@ function SimulatorContent() {
                 return (
                   <button
                     key={task.id}
-                    onClick={() => handleTaskSelect(task)}
+                    onClick={() => {
+                      if (!canAfford) {
+                        audio.ui.error();
+                      }
+                      handleTaskSelect(task);
+                    }}
                     disabled={!canAfford}
                     className={`w-full p-4 rounded-xl text-left transition-all ${
                       canAfford
@@ -657,11 +725,15 @@ function SimulatorContent() {
             </div>
 
             <Button
-              onClick={() => setShowTaskModal(false)}
+              onClick={() => {
+                audio.ui.click();
+                audio.ui.modalClose();
+                setShowTaskModal(false);
+              }}
               variant="outline"
               className="mt-4"
             >
-              닫기
+              {t('common.close')}
             </Button>
           </div>
         </div>
@@ -684,7 +756,10 @@ function SimulatorContent() {
               {store.currentEvent.choices.map((choice, i) => (
                 <button
                   key={i}
-                  onClick={() => handleEventChoice(choice)}
+                  onClick={() => {
+                    audio.ui.click();
+                    handleEventChoice(choice);
+                  }}
                   className="w-full p-3 bg-gray-800/80 hover:bg-gray-700 rounded-xl text-left text-sm transition-all active:scale-98"
                 >
                   {choice.text}
@@ -695,47 +770,92 @@ function SimulatorContent() {
         </div>
       )}
 
+      {/* Achievements Modal */}
+      {showAchievementsModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-2xl p-5 max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-amber-400" />
+                {t('achievement.list_title') || '업적'}
+              </h2>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-gray-400">
+                  {store.progress?.achievements?.length || 0}/{ACHIEVEMENTS.length}
+                </span>
+                <span className="text-amber-400 flex items-center gap-1">
+                  <Star className="w-4 h-4" />
+                  {calculateTotalPoints(store.progress?.achievements || [])}
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <AchievementList
+                achievements={ACHIEVEMENTS.map(a => ({
+                  id: a.id,
+                  name: a.name,
+                  description: a.description,
+                  icon: a.icon,
+                  rarity: a.rarity,
+                  points: a.points,
+                }))}
+                unlockedIds={store.progress?.achievements || []}
+              />
+            </div>
+            <Button
+              onClick={() => {
+                audio.ui.click();
+                audio.ui.modalClose();
+                setShowAchievementsModal(false);
+              }}
+              variant="outline"
+              className="mt-4"
+            >
+              {t('common.close')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Help Modal */}
       {showHelpModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-2xl p-5 max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">게임 방법</h2>
+            <h2 className="text-xl font-bold mb-4">{t('ui.help.title')}</h2>
             <div className="space-y-4 text-sm text-gray-300">
               <div>
-                <h3 className="font-bold text-white mb-1">게임 목표</h3>
-                <p>VocaVision 서비스를 성공적으로 운영하여 프리미엄 사용자 1,000명을 확보하거나 현금 1억원을 모으세요!</p>
+                <h3 className="font-bold text-white mb-1">{t('ui.help.goal_title')}</h3>
+                <p>{t('ui.help.goal_desc')}</p>
               </div>
               <div>
-                <h3 className="font-bold text-white mb-1">관리해야 할 것들</h3>
+                <h3 className="font-bold text-white mb-1">{t('ui.help.manage_title')}</h3>
                 <ul className="list-disc list-inside space-y-1">
-                  <li><strong>에너지:</strong> 업무 수행에 필요, 휴식으로 회복</li>
-                  <li><strong>스트레스:</strong> 100이 되면 번아웃!</li>
-                  <li><strong>서버 상태:</strong> 0이 되면 서비스 중단!</li>
-                  <li><strong>평판:</strong> 0이 되면 게임 오버!</li>
-                  <li><strong>자금:</strong> -100만원이 되면 파산!</li>
+                  <li>{t('ui.help.manage_energy')}</li>
+                  <li>{t('ui.help.manage_stress')}</li>
+                  <li>{t('ui.help.manage_server')}</li>
+                  <li>{t('ui.help.manage_reputation')}</li>
+                  <li>{t('ui.help.manage_cash')}</li>
                 </ul>
               </div>
               <div>
-                <h3 className="font-bold text-white mb-1">단축키</h3>
+                <h3 className="font-bold text-white mb-1">{t('ui.help.tips_title')}</h3>
                 <ul className="list-disc list-inside space-y-1">
-                  <li><strong>Ctrl+Shift+D:</strong> 디버그 패널 열기</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-1">팁</h3>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>에너지를 잘 관리하며 업무를 선택하세요</li>
-                  <li>랜덤 이벤트에 현명하게 대응하세요</li>
-                  <li>개발과 마케팅의 균형을 맞추세요</li>
+                  <li>{t('ui.help.tip1')}</li>
+                  <li>{t('ui.help.tip2')}</li>
+                  <li>{t('ui.help.tip3')}</li>
                 </ul>
               </div>
             </div>
             <Button
-              onClick={() => setShowHelpModal(false)}
+              onClick={() => {
+                audio.ui.click();
+                audio.ui.modalClose();
+                setShowHelpModal(false);
+              }}
               className="w-full mt-4"
               variant="gradient"
             >
-              확인
+              {t('common.confirm')}
             </Button>
           </div>
         </div>
@@ -746,19 +866,21 @@ function SimulatorContent() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full">
             <h2 className="text-2xl font-black text-red-400 mb-3 flex items-center gap-2">
-              <Trophy className="w-6 h-6" /> 게임 오버
+              <Trophy className="w-6 h-6" /> {t('ui.game_over.title')}
             </h2>
             <p className="text-sm text-gray-300 mb-4">{store.gameOverReason}</p>
             <div className="bg-gray-700/50 rounded-xl p-3 mb-4 text-xs">
               <div className="grid grid-cols-2 gap-2">
-                <div>생존 일수: <span className="text-white font-bold">{store.time.totalDays}일</span></div>
-                <div>최종 사용자: <span className="text-white font-bold">{formatNumber(store.business.users.total)}명</span></div>
-                <div>프리미엄: <span className="text-amber-400">{formatNumber(store.business.users.premium)}명</span></div>
-                <div>최종 잔고: <span className={store.business.finance.cash >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatMoney(store.business.finance.cash)}</span></div>
+                <div>{t('ui.game_over.survival_days')}: <span className="text-white font-bold">{store.time.totalDays}</span></div>
+                <div>{t('ui.game_over.final_users')}: <span className="text-white font-bold">{formatNumber(store.business.users.total)}</span></div>
+                <div>{t('ui.game_over.final_premium')}: <span className="text-amber-400">{formatNumber(store.business.users.premium)}</span></div>
+                <div>{t('ui.game_over.final_balance')}: <span className={store.business.finance.cash >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatMoney(store.business.finance.cash)}</span></div>
               </div>
             </div>
             <Button
               onClick={() => {
+                audio.ui.click();
+                audio.stopMusic();
                 store.resetGame();
                 setShowDifficultyModal(true);
               }}
@@ -766,7 +888,7 @@ function SimulatorContent() {
               variant="gradient"
             >
               <RotateCcw className="w-4 h-4 mr-2" />
-              다시 시작하기
+              {t('ui.game_over.restart')}
             </Button>
           </div>
         </div>
@@ -777,25 +899,27 @@ function SimulatorContent() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-amber-800 to-amber-900 border border-amber-500/50 rounded-2xl p-6 max-w-sm w-full">
             <h2 className="text-2xl font-black text-amber-400 mb-3 flex items-center gap-2">
-              <Trophy className="w-6 h-6" /> 축하합니다!
+              <Trophy className="w-6 h-6" /> {t('ui.victory.title')}
             </h2>
             <p className="text-sm text-gray-200 mb-2">
-              {store.victoryType === 'users' && '1,000명의 프리미엄 사용자를 확보했습니다!'}
-              {store.victoryType === 'money' && '1억원의 현금을 모았습니다!'}
-              {store.victoryType === 'acquisition' && '대기업에 인수되었습니다!'}
+              {store.victoryType === 'users' && t('ui.victory.users_desc')}
+              {store.victoryType === 'money' && t('ui.victory.money_desc')}
+              {store.victoryType === 'acquisition' && t('ui.victory.acquisition_desc')}
             </p>
-            <p className="text-xs text-amber-200 mb-4">VocaVision을 성공적인 EdTech 서비스로 성장시켰습니다!</p>
+            <p className="text-xs text-amber-200 mb-4">{t('ui.victory.success_message')}</p>
             <div className="bg-gray-700/50 rounded-xl p-3 mb-4 text-xs">
               <div className="grid grid-cols-2 gap-2">
-                <div>총 일수: <span className="text-white font-bold">{store.time.totalDays}일</span></div>
-                <div>최종 사용자: <span className="text-white font-bold">{formatNumber(store.business.users.total)}명</span></div>
-                <div>프리미엄: <span className="text-amber-400">{formatNumber(store.business.users.premium)}명</span></div>
-                <div>최종 잔고: <span className="text-emerald-400">{formatMoney(store.business.finance.cash)}</span></div>
+                <div>{t('ui.victory.total_days')}: <span className="text-white font-bold">{store.time.totalDays}</span></div>
+                <div>{t('ui.game_over.final_users')}: <span className="text-white font-bold">{formatNumber(store.business.users.total)}</span></div>
+                <div>{t('ui.game_over.final_premium')}: <span className="text-amber-400">{formatNumber(store.business.users.premium)}</span></div>
+                <div>{t('ui.game_over.final_balance')}: <span className="text-emerald-400">{formatMoney(store.business.finance.cash)}</span></div>
               </div>
             </div>
             <div className="flex gap-2">
               <Button
                 onClick={() => {
+                  audio.ui.click();
+                  audio.stopMusic();
                   store.resetGame();
                   setShowDifficultyModal(true);
                 }}
@@ -803,17 +927,18 @@ function SimulatorContent() {
                 className="flex-1"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                새 게임
+                {t('ui.victory.new_game')}
               </Button>
               <Button
                 onClick={() => {
+                  audio.ui.click();
                   // Continue playing
                   store.continueAfterVictory();
                 }}
                 variant="gradient"
                 className="flex-1"
               >
-                계속 플레이
+                {t('ui.victory.continue')}
               </Button>
             </div>
           </div>
@@ -822,7 +947,7 @@ function SimulatorContent() {
 
       {/* Footer tip */}
       <div className="text-center text-xs text-gray-600 py-4">
-        에너지/스트레스/서버/평판/자금 관리가 핵심! • Ctrl+Shift+D: 디버그
+        {t('ui.footer.tip')} • {t('ui.footer.debug')}
       </div>
     </div>
   );

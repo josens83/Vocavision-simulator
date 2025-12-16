@@ -382,6 +382,109 @@ function applySettings(settings: SettingsState) {
 }
 
 // ============================================
+// Audio Hook
+// ============================================
+
+/**
+ * 오디오 시스템 훅
+ */
+export function useAudio() {
+  const playSound = useCallback((soundId: string) => {
+    try {
+      // 동적 import로 오디오 시스템 로드 (브라우저에서만)
+      if (typeof window !== 'undefined') {
+        import('../audio').then(({ audioManager }) => {
+          if (audioManager.state?.suspended) return;
+          audioManager.playSound(soundId);
+        }).catch(() => {
+          // 오디오 로드 실패 시 무시
+        });
+      }
+    } catch {
+      // 오디오 재생 실패 시 무시 (게임 진행에 영향 없음)
+    }
+  }, []);
+
+  const playMusic = useCallback((trackId?: string) => {
+    try {
+      if (typeof window !== 'undefined') {
+        import('../audio').then(({ audioManager }) => {
+          audioManager.playMusic(trackId);
+        }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const stopMusic = useCallback(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        import('../audio').then(({ audioManager }) => {
+          audioManager.stopMusic();
+        }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const trigger = useCallback((event: string, data?: any) => {
+    try {
+      if (typeof window !== 'undefined') {
+        import('../audio').then(({ audioManager }) => {
+          audioManager.trigger(event, data);
+        }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  // UI 사운드 헬퍼
+  const ui = {
+    click: () => playSound('ui_click'),
+    hover: () => playSound('ui_hover'),
+    toggleOn: () => playSound('ui_toggle_on'),
+    toggleOff: () => playSound('ui_toggle_off'),
+    modalOpen: () => playSound('ui_modal_open'),
+    modalClose: () => playSound('ui_modal_close'),
+    error: () => playSound('ui_error'),
+    tabSwitch: () => playSound('ui_tab_switch'),
+  };
+
+  // 게임 사운드 헬퍼
+  const game = {
+    dayPass: () => playSound('day_pass'),
+    monthPass: () => playSound('month_pass'),
+    moneyGain: () => playSound('money_gain'),
+    moneyLoss: () => playSound('money_loss'),
+    userGain: () => playSound('user_gain'),
+    userLoss: () => playSound('user_loss'),
+    energyLow: () => playSound('energy_low'),
+    stressHigh: () => playSound('stress_high'),
+    eventAppear: () => playSound('event_appear'),
+    eventCritical: () => playSound('event_critical'),
+    eventPositive: () => playSound('event_positive'),
+    taskComplete: () => playSound('notif_success'),
+    achievement: () => playSound('notif_success'),
+  };
+
+  // 알림 사운드 헬퍼
+  const notification = {
+    info: () => playSound('notif_info'),
+    success: () => playSound('notif_success'),
+    warning: () => playSound('notif_warning'),
+    error: () => playSound('notif_error'),
+    critical: () => playSound('notif_critical'),
+  };
+
+  return {
+    playSound,
+    playMusic,
+    stopMusic,
+    trigger,
+    ui,
+    game,
+    notification,
+  };
+}
+
+// ============================================
 // Combined Hook
 // ============================================
 
@@ -398,6 +501,7 @@ export function useGameSystems() {
   const ending = useEndingCheck();
   const debug = useDebug();
   const i18n = useTranslation();
+  const audio = useAudio();
 
   return {
     analytics,
@@ -407,6 +511,7 @@ export function useGameSystems() {
     ending,
     debug,
     i18n,
+    audio,
   };
 }
 

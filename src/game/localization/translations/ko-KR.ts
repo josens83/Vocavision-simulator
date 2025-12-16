@@ -198,6 +198,10 @@ export const koKRTranslations: TranslationDictionary = {
   'achievement.investment': '투자 유치',
   'achievement.description.first_user': '첫 번째 유저를 획득했습니다!',
   'achievement.description.first_revenue': '첫 수익을 올렸습니다!',
+  'achievement.list_title': '업적',
+  'achievement.total_points': '총 포인트',
+  'achievement.locked_desc': '업적을 해금하면 내용이 공개됩니다.',
+  'achievement.unlocked': '업적 달성!',
 
   // ============================================
   // Endings
@@ -320,6 +324,97 @@ export const koKRTranslations: TranslationDictionary = {
   'number.million': '백만',
   'number.billion': '십억',
   'number.trillion': '조',
+
+  // ============================================
+  // Simulator UI
+  // ============================================
+  'ui.title': 'VocaVision',
+  'ui.subtitle': '1인 EdTech 시뮬레이터',
+  'ui.task.select': '업무 선택',
+  'ui.task.select_button': '업무 선택하기',
+  'ui.task.in_progress': '진행 중인 업무',
+  'ui.task.category.development': '개발',
+  'ui.task.category.marketing': '마케팅',
+  'ui.task.category.customer_support': '고객지원',
+  'ui.task.category.business': '비즈니스',
+  'ui.task.category.personal': '개인',
+
+  'ui.player.status': '플레이어 상태',
+  'ui.player.energy': '에너지',
+  'ui.player.stress': '스트레스',
+  'ui.player.physical': '체력',
+  'ui.player.mental': '정신력',
+
+  'ui.business.status': '비즈니스 현황',
+  'ui.business.balance': '잔고',
+  'ui.business.users': '사용자',
+  'ui.business.premium': '프리미엄',
+  'ui.business.reputation': '평판',
+  'ui.business.monthly_revenue': '월 수익',
+  'ui.business.monthly_cost': '월 비용',
+  'ui.business.net_profit': '순이익',
+  'ui.business.server_status': '서버 상태',
+  'ui.business.product_stability': '제품 안정성',
+
+  'ui.action.rest': '휴식',
+  'ui.action.exercise': '운동',
+  'ui.action.marketing': '마케팅',
+  'ui.action.server_check': '서버점검',
+
+  'ui.difficulty.title': 'VocaVision Simulator',
+  'ui.difficulty.subtitle': '1인 EdTech 사업 시뮬레이터',
+  'ui.difficulty.easy': '쉬움',
+  'ui.difficulty.easy_desc': '초기 자금 1천만원, 여유로운 시작',
+  'ui.difficulty.normal': '보통',
+  'ui.difficulty.normal_desc': '초기 자금 500만원, 균형잡힌 도전',
+  'ui.difficulty.hard': '어려움',
+  'ui.difficulty.hard_desc': '초기 자금 200만원, 생존이 목표',
+  'ui.difficulty.realistic': '현실',
+  'ui.difficulty.realistic_desc': '초기 자금 100만원, 실제 창업 체험',
+
+  'ui.help.title': '게임 방법',
+  'ui.help.goal_title': '게임 목표',
+  'ui.help.goal_desc': 'VocaVision 서비스를 성공적으로 운영하여 프리미엄 사용자 1,000명을 확보하거나 현금 1억원을 모으세요!',
+  'ui.help.manage_title': '관리해야 할 것들',
+  'ui.help.manage_energy': '에너지: 업무 수행에 필요, 휴식으로 회복',
+  'ui.help.manage_stress': '스트레스: 100이 되면 번아웃!',
+  'ui.help.manage_server': '서버 상태: 0이 되면 서비스 중단!',
+  'ui.help.manage_reputation': '평판: 0이 되면 게임 오버!',
+  'ui.help.manage_cash': '자금: -100만원이 되면 파산!',
+  'ui.help.tips_title': '팁',
+  'ui.help.tip1': '에너지를 잘 관리하며 업무를 선택하세요',
+  'ui.help.tip2': '랜덤 이벤트에 현명하게 대응하세요',
+  'ui.help.tip3': '개발과 마케팅의 균형을 맞추세요',
+
+  'ui.game_over.title': '게임 오버',
+  'ui.game_over.survival_days': '생존 일수',
+  'ui.game_over.final_users': '최종 사용자',
+  'ui.game_over.final_premium': '프리미엄',
+  'ui.game_over.final_balance': '최종 잔고',
+  'ui.game_over.restart': '다시 시작하기',
+
+  'ui.victory.title': '축하합니다!',
+  'ui.victory.users_desc': '1,000명의 프리미엄 사용자를 확보했습니다!',
+  'ui.victory.money_desc': '1억원의 현금을 모았습니다!',
+  'ui.victory.acquisition_desc': '대기업에 인수되었습니다!',
+  'ui.victory.success_message': 'VocaVision을 성공적인 EdTech 서비스로 성장시켰습니다!',
+  'ui.victory.total_days': '총 일수',
+  'ui.victory.new_game': '새 게임',
+  'ui.victory.continue': '계속 플레이',
+
+  'ui.skills': '스킬',
+  'ui.skill.coding': '코딩',
+  'ui.skill.design': '디자인',
+  'ui.skill.marketing': '마케팅',
+  'ui.skill.business': '비즈니스',
+  'ui.skill.communication': '소통',
+  'ui.skill.leadership': '리더십',
+
+  'ui.footer.tip': '에너지/스트레스/서버/평판/자금 관리가 핵심!',
+  'ui.footer.debug': 'Ctrl+Shift+D: 디버그',
+
+  'ui.alert.no_energy': '에너지가 부족합니다!',
+  'ui.alert.no_money': '자금이 부족합니다!',
 
   // ============================================
   // Notifications

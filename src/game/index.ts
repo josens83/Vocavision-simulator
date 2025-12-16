@@ -44,6 +44,7 @@ export {
   useEndingCheck,
   useDebug,
   useTranslation,
+  useAudio,
   useGameSystems,
 } from './store/systemIntegration';
 
