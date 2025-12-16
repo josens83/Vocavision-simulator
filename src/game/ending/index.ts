@@ -175,11 +175,24 @@ import {
   Ending,
   EndingType,
   EndingTier,
-  EndingState,
   EndingGrade,
+  EndingGradeInfo,
+  ENDING_GRADES,
+  getGradeFromScore,
   PlaythroughStats,
+  EndingDisplayStats,
+  toDisplayStats,
   NewGamePlusConfig,
 } from './types';
+
+// Re-export types for external use
+export type {
+  EndingGrade,
+  EndingGradeInfo,
+  EndingDisplayStats,
+  EndingState,
+} from './types';
+export { ENDING_GRADES, getGradeFromScore, toDisplayStats } from './types';
 import {
   victoryEndings,
   specialEndings,
@@ -188,6 +201,7 @@ import {
   victoryConditions,
   allEndings,
   getEndingById,
+  checkVictoryCondition,
 } from './endings';
 
 /**
@@ -273,10 +287,13 @@ export function getEndingTypeLabel(type: EndingType): string {
  */
 export function getEndingTierLabel(tier: EndingTier): string {
   const labels: Record<EndingTier, string> = {
-    common: '일반',
-    rare: '희귀',
-    epic: '에픽',
     legendary: '전설',
+    epic: '훌륭함',
+    great: '좋음',
+    good: '괜찮음',
+    neutral: '보통',
+    bad: '나쁨',
+    terrible: '최악',
   };
   return labels[tier] || tier;
 }
@@ -286,10 +303,13 @@ export function getEndingTierLabel(tier: EndingTier): string {
  */
 export function getEndingTierColor(tier: EndingTier): string {
   const colors: Record<EndingTier, string> = {
-    common: '#9CA3AF', // gray
-    rare: '#3B82F6', // blue
+    legendary: '#FFD700', // gold
     epic: '#A855F7', // purple
-    legendary: '#F59E0B', // amber
+    great: '#3B82F6', // blue
+    good: '#22C55E', // green
+    neutral: '#9CA3AF', // gray
+    bad: '#F97316', // orange
+    terrible: '#EF4444', // red
   };
   return colors[tier] || '#9CA3AF';
 }

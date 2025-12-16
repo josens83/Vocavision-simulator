@@ -15,12 +15,35 @@ export type EndingType =
 
 export type EndingTier =
   | 'legendary'        // 전설 (최고)
-  | 'epic'             // 서사시
-  | 'great'            // 훌륭함
-  | 'good'             // 좋음
+  | 'epic'             // 서사시 (훌륭함)
+  | 'great'            // 좋음
+  | 'good'             // 괜찮음
   | 'neutral'          // 보통
   | 'bad'              // 나쁨
   | 'terrible';        // 최악
+
+// 등급 시스템 (점수 기반)
+export type EndingGrade = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+
+export interface EndingGradeInfo {
+  rank: EndingGrade;
+  title: string;
+  color: string;
+  minScore: number;
+}
+
+export const ENDING_GRADES: EndingGradeInfo[] = [
+  { rank: 'S', title: '전설적인', color: '#FFD700', minScore: 10000 },
+  { rank: 'A', title: '훌륭한', color: '#A855F7', minScore: 7000 },
+  { rank: 'B', title: '좋은', color: '#3B82F6', minScore: 5000 },
+  { rank: 'C', title: '보통', color: '#22C55E', minScore: 3000 },
+  { rank: 'D', title: '미흡한', color: '#6B7280', minScore: 1000 },
+  { rank: 'F', title: '실패한', color: '#EF4444', minScore: 0 },
+];
+
+export function getGradeFromScore(score: number): EndingGradeInfo {
+  return ENDING_GRADES.find(g => score >= g.minScore) || ENDING_GRADES[ENDING_GRADES.length - 1];
+}
 
 // ============================================
 // 엔딩 조건
@@ -172,7 +195,7 @@ export interface PlaythroughStats {
   crisesOvercome: number;
 
   // NPC
-  npcsmet: number;
+  npcsMet: number;
   maxRelationships: number;
   partnershipsFormed: number;
 
@@ -182,9 +205,46 @@ export interface PlaythroughStats {
   mostUsedSkill: string;
 
   // 기타
-  decisionssMade: number;
+  decisionsMade: number;
   tasksCompleted: number;
   achievementsUnlocked: number;
+
+  // 점수 (UI용)
+  totalScore?: number;
+  grade?: EndingGrade;
+}
+
+/**
+ * UI용 간소화된 통계 인터페이스
+ */
+export interface EndingDisplayStats {
+  totalScore: number;
+  daysPlayed: number;
+  playTime: number;  // 초
+  totalRevenue: number;
+  maxUsers: number;
+  actionsPerformed: number;
+  achievementsUnlocked: number;
+  grade: EndingGrade;
+}
+
+/**
+ * PlaythroughStats에서 EndingDisplayStats로 변환
+ */
+export function toDisplayStats(stats: Partial<PlaythroughStats>): EndingDisplayStats {
+  const score = stats.totalScore || 0;
+  const gradeInfo = getGradeFromScore(score);
+
+  return {
+    totalScore: score,
+    daysPlayed: stats.totalDays || 0,
+    playTime: stats.totalPlayTime || 0,
+    totalRevenue: stats.totalRevenue || 0,
+    maxUsers: stats.maxUsers || 0,
+    actionsPerformed: stats.tasksCompleted || 0,
+    achievementsUnlocked: stats.achievementsUnlocked || 0,
+    grade: gradeInfo.rank,
+  };
 }
 
 // ============================================
@@ -295,6 +355,9 @@ export interface EndingSystemState {
   newGamePlusTier: number;
   bestScores: Record<string, number>;
 }
+
+// Alias for backwards compatibility
+export type EndingState = EndingSystemState;
 
 // ============================================
 // 상수

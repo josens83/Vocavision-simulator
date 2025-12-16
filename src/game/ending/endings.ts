@@ -656,3 +656,34 @@ export const getEndingsByTier = (tier: string): Ending[] => {
 export const getGameOverReasonById = (id: string): GameOverReason | undefined => {
   return gameOverReasons.find((r) => r.id === id);
 };
+
+/**
+ * 승리 조건 체크
+ */
+export const checkVictoryCondition = (conditionId: string, gameState: any): boolean => {
+  const condition = victoryConditions.find(c => c.id === conditionId);
+  if (!condition) return false;
+
+  return condition.requirements.every(req => {
+    const value = getNestedValue(gameState, req.target);
+    return checkCondition(value, req.operator as any, req.value);
+  });
+};
+
+// Helper: 중첩 객체에서 값 가져오기
+function getNestedValue(obj: any, path: string): any {
+  return path.split('.').reduce((acc, part) => acc?.[part], obj);
+}
+
+// Helper: 조건 검사
+function checkCondition(value: any, operator: string, target: any): boolean {
+  switch (operator) {
+    case '>': return value > target;
+    case '<': return value < target;
+    case '>=': return value >= target;
+    case '<=': return value <= target;
+    case '==': return value === target;
+    case '!=': return value !== target;
+    default: return false;
+  }
+}
