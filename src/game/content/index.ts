@@ -13,6 +13,12 @@ export {
   findEventById,
   getEventsByCategory,
   getEventsBySeverity,
+  getRandomEvent,
+  TECHNICAL_EVENTS,
+  BUSINESS_EVENTS,
+  USER_EVENTS,
+  PERSONAL_EVENTS,
+  MARKET_EVENTS,
 } from './events';
 
 // NPCs

@@ -14,7 +14,125 @@
  * - Chapter 13: Localization
  * - Chapter 14: Debug & Testing
  * - Chapter 15: Main Game Screen (Core Integration)
+ * - Chapter 16: UI Components & Modals
+ * - Chapter 17: Content & Achievements
+ * - Chapter 18: System Integration & Providers
  */
+
+// ============================================
+// Providers (Chapter 18)
+// ============================================
+
+export { GameProvider, useGame } from './providers';
+
+// ============================================
+// System Integration
+// ============================================
+
+export {
+  useSystemsInit,
+  useAnalyticsTracking,
+  useTutorial,
+  useSaveLoad,
+  useSettings,
+  useEndingCheck,
+  useDebug,
+  useTranslation,
+  useGameSystems,
+} from './store/systemIntegration';
+
+// ============================================
+// UI Modals
+// ============================================
+
+export {
+  SaveLoadModal,
+  SettingsModal,
+  TutorialOverlay,
+  WelcomeTutorial,
+  EndingScreen,
+  AchievementPopup,
+  AchievementList,
+  useAchievementPopup,
+  DebugPanel,
+} from './ui/modals';
+
+// ============================================
+// Content & Achievements
+// ============================================
+
+export {
+  // Events
+  ALL_EVENTS,
+  ENHANCED_PROBABILISTIC_EVENTS,
+  EVENT_COUNTS,
+  TOTAL_EVENT_COUNT,
+  findEventById,
+  getEventsByCategory,
+  getEventsBySeverity,
+  getRandomEvent,
+  TECHNICAL_EVENTS,
+  BUSINESS_EVENTS,
+  USER_EVENTS,
+  PERSONAL_EVENTS,
+  MARKET_EVENTS,
+
+  // NPCs
+  NPCS,
+  initializeNPCRelationships,
+  updateRelationship,
+  decayRelationships,
+  checkNPCInteraction,
+  getRelationshipLevel,
+  getNPCById,
+
+  // Story Arcs
+  STORY_ARCS,
+  startStoryArc,
+  completeChapter,
+  setStoryFlag,
+  isArcCompleted,
+  findAvailableArcs,
+  getCurrentChapterEvents,
+  getArcById,
+
+  // Achievements
+  ACHIEVEMENTS,
+  ACHIEVEMENT_STATS,
+  getAchievementById,
+  getAchievementsByCategory,
+  getAchievementsByRarity,
+  checkUnlockableAchievements,
+  calculateTotalPoints,
+  getCategoryLabel,
+  getRarityLabel,
+
+  // Statistics
+  CONTENT_STATISTICS,
+} from './content';
+
+export type {
+  // NPC Types
+  NPC,
+  PersonalityTraits,
+  NPCInteraction,
+  NPCChoice,
+  NPCRelationship,
+
+  // Story Types
+  StoryArc,
+  StoryChapter,
+  ChapterTrigger,
+  StoryEvent,
+  StoryChoice,
+  StoryBranch,
+  StoryProgress,
+
+  // Achievement Types
+  Achievement,
+  AchievementCategory,
+  AchievementReward,
+} from './content';
 
 // ============================================
 // Core Game System (Chapter 15)
@@ -330,6 +448,15 @@ export const VocaVision = {
 
   // Debug
   debug: () => import('./debug').then((m) => m.debugSystem),
+
+  // Content
+  content: () => import('./content'),
+
+  // UI Modals
+  modals: () => import('./ui/modals'),
+
+  // Providers
+  providers: () => import('./providers'),
 
   // Version
   version: '1.0.0',
